@@ -5,17 +5,21 @@ Reusable development container template for future projects.
 This repository packages three things together:
 
 - a multi-profile `.devcontainer/` setup for base, Python, TypeScript, and fullstack work
-- workspace-managed VS Code chat customizations in `.github/prompts/`
+- workspace-managed VS Code prompt files in `.github/prompts/`
+- workspace-managed VS Code custom agents in `.github/agents/`
+- workspace-managed VS Code file-based instructions in `.github/instructions/`
 - repo-managed Speckit preset and workflow assets in `spec-kit/`
 
-When a future project uses this repository's dev container setup, VS Code automatically detects and loads the bundled custom agents, instructions, and prompts without needing any installation steps.
+When a future project uses this repository's dev container setup, VS Code automatically detects and loads the bundled prompts, agents, and instructions from their workspace folders without needing any installation step.
 
-The installer copies only `.devcontainer/` and `.github/prompts/` into the target project. Speckit presets and workflows are installed directly into `.specify/` without leaving a separate `spec-kit/` directory in the target repo.
+The installer copies `.devcontainer/`, `.github/prompts/`, `.github/agents/`, and `.github/instructions/` into the target project. Speckit presets and workflows are installed directly into `.specify/` without leaving a separate `spec-kit/` directory in the target repo.
 
 ## Repository Layout
 
 - `.devcontainer/`: container build, bootstrap, and profile-switching scripts
-- `.github/prompts/`: workspace-scoped VS Code user customizations
+- `.github/prompts/`: workspace-scoped slash-command prompt files
+- `.github/agents/`: workspace-scoped custom agents
+- `.github/instructions/`: workspace-scoped file-based instructions
 - `spec-kit/`: bundled Speckit preset and custom workflow assets
 - `extras/`: optional prompts and customizations not installed by default
 - `.speckit-version`: pinned Speckit CLI version used by the installer and CI
@@ -23,13 +27,20 @@ The installer copies only `.devcontainer/` and `.github/prompts/` into the targe
 
 ## Install Into A Future Project
 
+Quick paths:
+
+1. Host bootstrap only: `curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .`
+2. Host bootstrap plus host Speckit bootstrap: `curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- --with-speckit .`
+3. Host bootstrap first, then container-native Speckit bootstrap: `dev-env install speckit .` after reopening in the container
+4. Refresh copied workspace assets from inside the container: `dev-env update workspace .`
+
 From the target repository root:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
 ```
 
-This installs `.devcontainer/` and `.github/prompts/` into the current project.
+This installs `.devcontainer/`, `.github/prompts/`, `.github/agents/`, and `.github/instructions/` into the current project.
 
 If those directories already exist and you want to replace them:
 
@@ -43,7 +54,35 @@ To install the environment and bootstrap Speckit in the target project too:
 curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- --with-speckit .
 ```
 
+*Note: The `--with-speckit` flag requires `uv` (specifically `uvx`) or `specify` to be installed on your machine. If you don't have those, you can run the basic install command on your host machine, rebuild the container, and then run the `--with-speckit` command from inside the container where `uv` is available by default.*
+
 That creates `.specify/` plus the generated Speckit command files under `.github/` without copying `spec-kit/` into the target repository.
+
+If you prefer not to install Spec Kit from the host at all, use a two-step flow:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
+```
+
+Then reopen the project in the dev container and run:
+
+```bash
+dev-env install speckit .
+```
+
+The `dev-env` command is installed by `.devcontainer/post-create.sh`, so once the container is ready you can bootstrap Spec Kit without any extra host-machine dependencies.
+
+If you later update this repository and want to refresh the copied `.devcontainer/` and `.github/` assets from inside the container, run:
+
+```bash
+dev-env update workspace .
+```
+
+If you want that refresh to also bootstrap or refresh the bundled Spec Kit setup in the target repo, run:
+
+```bash
+dev-env update workspace --with-speckit .
+```
 
 If the target already has `.specify/` and you intentionally want to reinitialize it, add `--force-speckit-init`.
 
@@ -57,7 +96,7 @@ bash install.sh --source-dir "$PWD" ../my-project
 
 1. Open the target repository in VS Code.
 2. Run `Dev Containers: Reopen in Container`.
-3. After the container is created, your bundled customizations will be installed automatically.
+3. VS Code will detect the bundled workspace customizations automatically.
 
 Prompt files show up as slash commands in chat, for example `/bootstrap-speckit`.
 Custom agents show up in the agent picker, not in the slash-command list.
@@ -65,7 +104,11 @@ Instructions files do not become slash commands. They are applied automatically 
 
 ## Update Bundled Customizations
 
-Edit the files under `.github/prompts/` in this repository.
+Edit the files under these folders in this repository:
+
+- `.github/prompts/`
+- `.github/agents/`
+- `.github/instructions/`
 
 Modifications to these files are picked up by VS Code automatically, as they are part of the workspace context. No installation script is necessary!
 
@@ -89,9 +132,10 @@ bash install.sh --help
 
 Supported options:
 
-- `--force`: replace existing `.devcontainer/` and `.github/prompts/`
+- `--force`: replace existing `.devcontainer/`, `.github/prompts/`, `.github/agents/`, and `.github/instructions/`
 - `--dry-run`: show what would be installed without writing anything
 - `--with-speckit`: initialize Spec Kit and install the bundled preset and workflow
+- `--speckit-only`: initialize or update only Spec Kit assets without reinstalling `.devcontainer/` or `.github/`
 - `--force-speckit-init`: reinitialize Spec Kit even when `.specify/` already exists
 - `--speckit-version`: pin the Spec Kit CLI version used for bootstrap
 - `--ref`: install from a different Git ref

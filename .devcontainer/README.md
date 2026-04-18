@@ -9,7 +9,9 @@ This workspace uses one dev container entrypoint with four Docker build targets.
 
 The active profile is the `target` value in `.devcontainer/devcontainer.json`.
 
-On container creation, `.devcontainer/post-create.sh` also installs the repo's VS Code chat customizations from `.vscode-prompts/` into the container user's prompt directories. This makes your custom agents, instructions, and prompts available in future repositories that reuse this dev container setup.
+On container creation, `.devcontainer/post-create.sh` only finishes shared tool setup. The repo's VS Code chat customizations are workspace files, so VS Code discovers them directly from the repository instead of copying them into the container user's profile.
+
+The same post-create step also installs a `dev-env` helper into `/usr/local/bin`. In a repo that already has this `.devcontainer/` folder, you can run `dev-env install speckit .` from the integrated terminal to bootstrap Spec Kit after the container is ready, or `dev-env update workspace .` to refresh the copied workspace assets.
 
 On Linux, switch profiles with:
 
@@ -26,19 +28,12 @@ If you prefer to switch manually, edit the `build.target` field in `.devcontaine
 
 ## Bundled VS Code Customizations
 
-Store reusable user-level chat customizations in `.vscode-prompts/`.
+Store reusable workspace chat customizations in these folders:
 
-The installer copies supported files into these locations when the container is created:
+- `.github/prompts/` for `*.prompt.md` slash commands
+- `.github/agents/` for `*.agent.md` custom agents
+- `.github/instructions/` for `*.instructions.md` file-based instructions
 
-- `~/.vscode-server/data/User/prompts`
-- `~/.vscode-server-insiders/data/User/prompts`
-- `~/.config/Code/User/prompts`
-- `~/.config/Code - Insiders/User/prompts`
+These files are versioned with the repo and loaded automatically by VS Code when the workspace opens.
 
-Supported file types:
-
-- `*.agent.md`
-- `*.instructions.md`
-- `*.prompt.md`
-
-If you update files in `.vscode-prompts/`, rebuild the container or run `bash .devcontainer/install-vscode-prompts.sh` inside the container to refresh the installed copies.
+If you update these files, reload the VS Code window if the customization UI does not refresh immediately.

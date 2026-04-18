@@ -10,6 +10,7 @@ force=0
 with_speckit=0
 dry_run=0
 force_speckit_init=0
+speckit_only=0
 target_dir="."
 source_dir="${DEV_ENV_SOURCE_DIR:-}"
 default_speckit_version="0.7.0"
@@ -19,12 +20,13 @@ usage() {
   cat <<EOF
 Usage: install.sh [options] [target-directory]
 
-Install the dev-env .devcontainer and .github/prompts assets into a target project.
+Install the dev-env .devcontainer and workspace chat customization assets into a target project.
 
 Options:
-  --force             Replace existing .devcontainer and .github/prompts
+  --force             Replace existing .devcontainer, .github/prompts, .github/agents, and .github/instructions
   --dry-run           Show what would be installed without writing anything
   --with-speckit      Initialize Spec Kit and install the bundled preset/workflow
+  --speckit-only      Only install Spec Kit assets; do not copy dev-env workspace files
   --force-speckit-init Reinitialize Spec Kit when .specify already exists
   --speckit-version V Pin the Spec Kit CLI version used for bootstrap (default: $default_speckit_version)
   --ref REF           Git ref to download from (default: main)
@@ -37,6 +39,7 @@ Examples:
   ./install.sh --dry-run .
   ./install.sh --with-speckit .
   ./install.sh --with-speckit --force-speckit-init .
+  ./install.sh --with-speckit --speckit-only .
   ./install.sh --with-speckit --speckit-version $default_speckit_version .
   ./install.sh --force ../my-project
   curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
@@ -88,6 +91,10 @@ while [[ $# -gt 0 ]]; do
       with_speckit=1
       shift
       ;;
+    --speckit-only)
+      speckit_only=1
+      shift
+      ;;
     --force-speckit-init)
       force_speckit_init=1
       shift
@@ -131,6 +138,11 @@ done
 if [[ $# -gt 0 ]]; then
   echo "Unexpected arguments: $*" >&2
   usage >&2
+  exit 1
+fi
+
+if [[ $speckit_only -eq 1 && $with_speckit -ne 1 ]]; then
+  echo "--speckit-only requires --with-speckit." >&2
   exit 1
 fi
 
@@ -191,7 +203,7 @@ run_speckit() {
     return
   fi
 
-  echo "Spec Kit requires 'specify' or 'uvx' when --with-speckit is used." >&2
+  echo "Spec Kit requires 'specify' or 'uvx' to run. If you don't have 'uv' on your host machine, you can run this script again from inside the dev container after it finishes building!" >&2
   exit 1
 }
 
@@ -268,13 +280,22 @@ if [[ -z "$speckit_version" ]]; then
   speckit_version="${DEV_ENV_SPECKIT_VERSION:-$default_speckit_version}"
 fi
 
+assets=(
+  .devcontainer
+  .github/prompts
+  .github/agents
+  .github/instructions
+)
+
 # Validate source directories
-for asset in .devcontainer .github/prompts; do
-  if [[ ! -d "$source_root/$asset" ]]; then
-    echo "Missing required directory in source: $asset" >&2
-    exit 1
-  fi
-done
+if [[ $speckit_only -ne 1 ]]; then
+  for asset in "${assets[@]}"; do
+    if [[ ! -d "$source_root/$asset" ]]; then
+      echo "Missing required directory in source: $asset" >&2
+      exit 1
+    fi
+  done
+fi
 
 if [[ $with_speckit -eq 1 && ! -d "$source_root/spec-kit" ]]; then
   echo "Missing required directory in source: spec-kit (needed for --with-speckit)" >&2
@@ -284,13 +305,15 @@ fi
 # Dry-run: report what would happen and exit
 if [[ $dry_run -eq 1 ]]; then
   echo "Dry run - the following would be installed into $target_dir:"
-  for asset in .devcontainer .github/prompts; do
-    if [[ -e "$target_dir/$asset" ]]; then
-      echo "  replace $asset"
-    else
-      echo "  create  $asset"
-    fi
-  done
+  if [[ $speckit_only -ne 1 ]]; then
+    for asset in "${assets[@]}"; do
+      if [[ -e "$target_dir/$asset" ]]; then
+        echo "  replace $asset"
+      else
+        echo "  create  $asset"
+      fi
+    done
+  fi
   if [[ $with_speckit -eq 1 ]]; then
     if has_speckit_templates; then
       echo "  skip    .specify bootstrap (already initialized)"
@@ -311,35 +334,44 @@ if [[ $with_speckit -eq 1 && -d "$target_dir/.specify" && $force_speckit_init -n
   exit 1
 fi
 
-# Collect all conflicts before failing
-conflicts=()
-for asset in .devcontainer .github/prompts; do
-  if [[ -e "$target_dir/$asset" && $force -ne 1 ]]; then
-    conflicts+=("$target_dir/$asset")
-  fi
-done
+if [[ $speckit_only -ne 1 ]]; then
+  # Collect all conflicts before failing
+  conflicts=()
+  for asset in "${assets[@]}"; do
+    if [[ -e "$target_dir/$asset" && $force -ne 1 ]]; then
+      conflicts+=("$target_dir/$asset")
+    fi
+  done
 
-if (( ${#conflicts[@]} )); then
-  printf '%s already exists.\n' "${conflicts[@]}" >&2
-  echo "Re-run with --force to replace." >&2
-  exit 1
+  if (( ${#conflicts[@]} )); then
+    printf '%s already exists.\n' "${conflicts[@]}" >&2
+    echo "Re-run with --force to replace." >&2
+    exit 1
+  fi
+
+  # Copy assets to target
+  for asset in "${assets[@]}"; do
+    if [[ -e "$target_dir/$asset" ]]; then
+      rm -rf "$target_dir/$asset"
+    fi
+
+    mkdir -p "$(dirname "$target_dir/$asset")"
+    cp -R "$source_root/$asset" "$target_dir/$asset"
+  done
 fi
-
-# Copy assets to target
-for asset in .devcontainer .github/prompts; do
-  if [[ -e "$target_dir/$asset" ]]; then
-    rm -rf "$target_dir/$asset"
-  fi
-
-  cp -R "$source_root/$asset" "$target_dir/$asset"
-done
 
 if [[ $with_speckit -eq 1 ]]; then
   bootstrap_speckit
 fi
 
-echo "Installed dev-env into $target_dir"
+if [[ $speckit_only -eq 1 ]]; then
+  echo "Installed Spec Kit customization into $target_dir"
+else
+  echo "Installed dev-env into $target_dir"
+fi
 if [[ $with_speckit -eq 1 ]]; then
   echo "Spec Kit bootstrap completed with version target $speckit_version."
 fi
-echo "Next: open the project in VS Code and run 'Dev Containers: Reopen in Container'."
+if [[ $speckit_only -eq 0 ]]; then
+  echo "Next: open the project in VS Code and run 'Dev Containers: Reopen in Container'."
+fi

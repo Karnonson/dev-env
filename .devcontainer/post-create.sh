@@ -13,5 +13,8 @@ if ! command -v uv >/dev/null 2>&1; then
   curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
 fi
 
+if [[ -f "$script_dir/bin/dev-env" ]]; then
+  sudo install -m 0755 "$script_dir/bin/dev-env" /usr/local/bin/dev-env
+fi
 
-bash "$script_dir/install-vscode-prompts.sh"
+
