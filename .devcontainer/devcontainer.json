@@ -1,0 +1,62 @@
+{
+  "name": "vision",
+  "build": {
+    "context": "..",
+    "dockerfile": "Dockerfile",
+    "target": "base"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    }
+  },
+  "containerEnv": {
+    "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "forwardPorts": [3000, 4173, 5173, 8000, 8501],
+  "portsAttributes": {
+    "3000": {
+      "label": "Web App"
+    },
+    "4173": {
+      "label": "Preview Server"
+    },
+    "5173": {
+      "label": "Vite Dev Server"
+    },
+    "8000": {
+      "label": "Python App"
+    },
+    "8501": {
+      "label": "Streamlit"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.formatOnSave": true,
+        "files.eol": "\n",
+        "python.terminal.activateEnvironment": true,
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
+      "extensions": [
+        "charliermarsh.ruff",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens",
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-vscode.makefile-tools"
+      ]
+    }
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true
+}
