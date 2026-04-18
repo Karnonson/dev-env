@@ -59,6 +59,10 @@ bash install.sh --source-dir "$PWD" ../my-project
 2. Run `Dev Containers: Reopen in Container`.
 3. After the container is created, your bundled customizations will be installed automatically.
 
+Prompt files show up as slash commands in chat, for example `/bootstrap-speckit`.
+Custom agents show up in the agent picker, not in the slash-command list.
+Instructions files do not become slash commands. They are applied automatically when they match by `applyTo`, or can be added from the chat customizations UI.
+
 ## Update Bundled Customizations
 
 Edit the files under `.vscode-prompts/` in this repository.
@@ -68,6 +72,20 @@ To re-install them inside an already running container:
 ```bash
 bash .devcontainer/install-vscode-prompts.sh
 ```
+
+If you use a non-default VS Code profile, the installer also copies the files into profile-scoped user-data folders when they exist.
+
+## Troubleshooting Chat Customizations
+
+If the files were installed but you do not see them in chat:
+
+1. Open `Chat: Open Chat Customizations` and verify the prompts, agents, or instructions appear there.
+2. In the Chat view, open the context menu and use Diagnostics to see any loading errors.
+3. Re-run `bash .devcontainer/install-vscode-prompts.sh` inside the container, then reload the VS Code window.
+4. Confirm you are checking the right UI surface:
+   - prompt files: slash commands
+   - custom agents: agent picker
+   - instructions: automatic application or the instructions picker
 
 ## Installer Options
 

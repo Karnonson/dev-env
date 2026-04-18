@@ -151,7 +151,7 @@ cleanup() {
 trap cleanup EXIT
 
 find_extracted_source_root() {
-  local devcontainer_dir
+  local devcontainer_dir extracted_root
 
   devcontainer_dir="$(find "$temp_dir" -mindepth 2 -maxdepth 4 -type d -name .devcontainer | head -n 1 || true)"
   if [[ -n "$devcontainer_dir" ]]; then
@@ -159,15 +159,21 @@ find_extracted_source_root() {
     return
   fi
 
-  find "$temp_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1
+  extracted_root="$(find "$temp_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  if [[ -z "$extracted_root" ]]; then
+    echo "Failed to locate source root in downloaded archive." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$extracted_root"
 }
 
 run_speckit() {
   local local_version
 
-  if command -v specify >/dev/null 2>&1; then
-    local_version="$(get_local_specify_version)"
+  local_version="$(get_local_specify_version)"
 
+  if command -v specify >/dev/null 2>&1; then
     if [[ -z "$local_version" || "$local_version" == "$speckit_version" ]]; then
       specify "$@"
       return
