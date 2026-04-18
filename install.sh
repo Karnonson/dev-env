@@ -62,19 +62,27 @@ get_local_specify_version() {
 }
 
 has_speckit_templates() {
-  local command_file
+  local required_file
+  local required_files=(
+    .specify/presets/orchestrator-workflow/preset.yml
+    .specify/presets/orchestrator-workflow/commands/speckit.constitution.md
+    .specify/presets/orchestrator-workflow/commands/speckit.design.md
+    .specify/presets/orchestrator-workflow/commands/speckit.implement.md
+    .specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md
+    .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
+    .specify/workflows/orchestrator-design-first/workflow.yml
+    .github/agents/speckit.constitution.agent.md
+    .github/agents/speckit.design.agent.md
+    .github/agents/speckit.implement.agent.md
+  )
 
-  if [[ ! -d "$target_dir/.specify" ]]; then
-    return 1
-  fi
-
-  while IFS= read -r command_file; do
-    if [[ -n "$command_file" ]]; then
-      return 0
+  for required_file in "${required_files[@]}"; do
+    if [[ ! -f "$target_dir/$required_file" ]]; then
+      return 1
     fi
-  done < <(find "$target_dir/.github" -type f \( -name 'speckit.*.agent.md' -o -name 'speckit.*.prompt.md' \) -print 2>/dev/null)
+  done
 
-  return 1
+  return 0
 }
 
 while [[ $# -gt 0 ]]; do

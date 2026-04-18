@@ -31,8 +31,12 @@ Quick paths:
 
 1. Host bootstrap only: `curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .`
 2. Host bootstrap plus host Speckit bootstrap: `curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- --with-speckit .`
-3. Host bootstrap first, then container-native Speckit bootstrap: `dev-env install speckit .` after reopening in the container
-4. Refresh copied workspace assets from inside the container: `dev-env update workspace .`
+3. Host bootstrap first, then container-native Speckit bootstrap: `kite install speckit .` after reopening in the container
+4. Refresh copied workspace assets from inside the container: `kite update workspace .`
+5. Preview a workspace refresh without changing files: `kite update workspace --dry-run .`
+6. Diagnose the container-native setup: `kite doctor .`
+7. Check whether assets are current and Spec Kit is bootstrapped: `kite status .`
+8. Emit machine-readable status for scripts or CI: `kite status --json .`
 
 From the target repository root:
 
@@ -67,22 +71,48 @@ curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh |
 Then reopen the project in the dev container and run:
 
 ```bash
-dev-env install speckit .
+kite install speckit .
 ```
 
-The `dev-env` command is installed by `.devcontainer/post-create.sh`, so once the container is ready you can bootstrap Spec Kit without any extra host-machine dependencies.
+The `kite` command is installed by `.devcontainer/post-create.sh`, so once the container is ready you can bootstrap Spec Kit without any extra host-machine dependencies.
 
 If you later update this repository and want to refresh the copied `.devcontainer/` and `.github/` assets from inside the container, run:
 
 ```bash
-dev-env update workspace .
+kite update workspace .
 ```
 
 If you want that refresh to also bootstrap or refresh the bundled Spec Kit setup in the target repo, run:
 
 ```bash
-dev-env update workspace --with-speckit .
+kite update workspace --with-speckit .
 ```
+
+To preview what `kite update workspace` would replace before writing changes, run:
+
+```bash
+kite update workspace --dry-run .
+```
+
+To verify the repo is ready for the container-native workflow and get exact fix commands for anything missing, run:
+
+```bash
+kite doctor .
+```
+
+To see whether the copied workspace assets are current and whether the bundled Spec Kit setup is already bootstrapped, run:
+
+```bash
+kite status .
+```
+
+To get the same status data as JSON for scripts or CI checks, run:
+
+```bash
+kite status --json .
+```
+
+For command-specific help, run commands such as `kite help update workspace` or `kite help doctor`.
 
 If the target already has `.specify/` and you intentionally want to reinitialize it, add `--force-speckit-init`.
 

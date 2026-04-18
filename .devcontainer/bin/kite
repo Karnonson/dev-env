@@ -1,0 +1,777 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+default_repo="Karnonson/dev-env"
+default_ref="main"
+default_speckit_version="0.7.0"
+
+repo="$default_repo"
+ref="$default_ref"
+source_dir=""
+target_dir="."
+speckit_version=""
+with_speckit=0
+force_speckit_init=0
+dry_run=0
+status_json=0
+mode=""
+temp_dir=""
+source_root=""
+
+assets=(
+  .devcontainer
+  .github/prompts
+  .github/agents
+  .github/instructions
+)
+
+cleanup() {
+  if [[ -n "$temp_dir" && -d "$temp_dir" ]]; then
+    rm -rf "$temp_dir"
+  fi
+}
+
+trap cleanup EXIT
+
+general_help() {
+  cat <<EOF
+Usage:
+  kite install speckit [options] [target-directory]
+  kite update workspace [options] [target-directory]
+  kite doctor [options] [target-directory]
+  kite status [options] [target-directory]
+  kite help [command]
+
+Commands:
+  install speckit    Bootstrap the bundled Spec Kit preset and workflow into a repo
+  update workspace   Refresh .devcontainer and .github workspace assets in a repo
+  doctor             Verify container tooling, workspace assets, and Spec Kit readiness
+  status             Show whether workspace assets are current and whether Spec Kit is bootstrapped
+  help               Show general or command-specific help
+
+Common examples:
+  kite install speckit .
+  kite update workspace .
+  kite update workspace --dry-run --with-speckit .
+  kite doctor .
+  kite status .
+
+Run kite help install speckit[0m or kite help update workspace[0m for command details.
+EOF
+}
+
+install_speckit_help() {
+  cat <<EOF
+Usage:
+  kite install speckit [options] [target-directory]
+
+Bootstrap the bundled Spec Kit preset and workflow into a target repo without reinstalling the workspace assets.
+
+Options:
+  --force-speckit-init  Reinitialize Spec Kit when .specify already exists
+  --speckit-version V   Pin the Spec Kit CLI version used for bootstrap
+  --repo OWNER/REPO     Download dev-env assets from a different GitHub repository
+  --ref REF             Download dev-env assets from a different Git ref
+  --source-dir PATH     Use a local dev-env checkout instead of downloading
+  -h, --help            Show this help text
+
+Examples:
+  kite install speckit .
+  kite install speckit --force-speckit-init .
+  kite install speckit --source-dir /workspaces/dev-env .
+EOF
+}
+
+update_workspace_help() {
+  cat <<EOF
+Usage:
+  kite update workspace [options] [target-directory]
+
+Refresh the copied .devcontainer and .github workspace assets in a target repo.
+
+Options:
+  --dry-run            Preview what would be replaced without writing changes
+  --with-speckit       Refresh workspace assets and bootstrap the bundled Spec Kit setup
+  --force-speckit-init Reinitialize Spec Kit when .specify already exists
+  --speckit-version V  Pin the Spec Kit CLI version used for bootstrap
+  --repo OWNER/REPO    Download dev-env assets from a different GitHub repository
+  --ref REF            Download dev-env assets from a different Git ref
+  --source-dir PATH    Use a local dev-env checkout instead of downloading
+  -h, --help           Show this help text
+
+Examples:
+  kite update workspace .
+  kite update workspace --dry-run .
+  kite update workspace --with-speckit .
+EOF
+}
+
+doctor_help() {
+  cat <<EOF
+Usage:
+  kite doctor [options] [target-directory]
+
+Verify whether the target repo is ready for the container-native dev-env workflow.
+
+Checks:
+  - uv availability
+  - uvx or specify availability
+  - required workspace asset folders
+  - whether workspace assets match the selected source
+  - whether the bundled Spec Kit preset and workflow are installed
+
+Options:
+  --speckit-version V  Include a pinned Spec Kit version in suggested fix commands
+  --repo OWNER/REPO    Compare against a different GitHub repository
+  --ref REF            Compare against a different Git ref
+  --source-dir PATH    Compare against a local dev-env checkout instead of downloading
+  -h, --help           Show this help text
+
+Examples:
+  kite doctor .
+  kite doctor --source-dir /workspaces/dev-env .
+EOF
+}
+
+status_help() {
+  cat <<EOF
+Usage:
+  kite status [options] [target-directory]
+
+Show whether the workspace assets are current and whether the bundled Spec Kit setup is bootstrapped.
+
+Options:
+  --json               Emit machine-readable JSON output
+  --repo OWNER/REPO    Compare against a different GitHub repository
+  --ref REF            Compare against a different Git ref
+  --source-dir PATH    Compare against a local dev-env checkout instead of downloading
+  -h, --help           Show this help text
+
+Examples:
+  kite status .
+  kite status --json .
+  kite status --source-dir /workspaces/dev-env .
+EOF
+}
+
+show_help() {
+  case "$1" in
+    "install-speckit")
+      install_speckit_help
+      ;;
+    "update-workspace")
+      update_workspace_help
+      ;;
+    "doctor")
+      doctor_help
+      ;;
+    "status")
+      status_help
+      ;;
+    *)
+      general_help
+      ;;
+  esac
+}
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+shell_join() {
+  local arg quoted output=""
+
+  for arg in "$@"; do
+    printf -v quoted '%q' "$arg"
+    if [[ -n "$output" ]]; then
+      output+=" "
+    fi
+    output+="$quoted"
+  done
+
+  printf '%s\n' "$output"
+}
+
+json_escape() {
+  local value="$1"
+
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  value=${value//$'\t'/\\t}
+
+  printf '"%s"' "$value"
+}
+
+json_array() {
+  local first=1 item
+
+  printf '['
+  for item in "$@"; do
+    if [[ $first -eq 0 ]]; then
+      printf ','
+    fi
+    json_escape "$item"
+    first=0
+  done
+  printf ']'
+}
+
+find_extracted_source_root() {
+  local devcontainer_dir extracted_root
+
+  devcontainer_dir="$(find "$temp_dir" -mindepth 2 -maxdepth 4 -type d -name .devcontainer | head -n 1 || true)"
+  if [[ -n "$devcontainer_dir" ]]; then
+    dirname "$devcontainer_dir"
+    return
+  fi
+
+  extracted_root="$(find "$temp_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1 || true)"
+  if [[ -z "$extracted_root" ]]; then
+    echo "Failed to locate source root in downloaded archive." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$extracted_root"
+}
+
+resolve_source_root() {
+  if [[ -n "$source_root" ]]; then
+    printf '%s\n' "$source_root"
+    return
+  fi
+
+  if [[ -n "$source_dir" ]]; then
+    source_root="$(cd "$source_dir" 2>/dev/null && pwd || true)"
+    if [[ -z "$source_root" || ! -d "$source_root" ]]; then
+      echo "Source directory does not exist: $source_dir" >&2
+      exit 1
+    fi
+
+    printf '%s\n' "$source_root"
+    return
+  fi
+
+  require_command curl
+  require_command tar
+  require_command mktemp
+
+  temp_dir="$(mktemp -d)"
+  local archive_path="$temp_dir/dev-env.tar.gz"
+  local archive_url="https://github.com/${repo}/archive/${ref}.tar.gz"
+
+  curl -fsSL "$archive_url" -o "$archive_path"
+  tar -xzf "$archive_path" -C "$temp_dir"
+  source_root="$(find_extracted_source_root)"
+  printf '%s\n' "$source_root"
+}
+
+has_speckit_bootstrap() {
+  local target="$1"
+  local required_file
+  local required_files=(
+    .specify/presets/orchestrator-workflow/preset.yml
+    .specify/presets/orchestrator-workflow/commands/speckit.constitution.md
+    .specify/presets/orchestrator-workflow/commands/speckit.design.md
+    .specify/presets/orchestrator-workflow/commands/speckit.implement.md
+    .specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md
+    .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
+    .specify/workflows/orchestrator-design-first/workflow.yml
+    .github/agents/speckit.constitution.agent.md
+    .github/agents/speckit.design.agent.md
+    .github/agents/speckit.implement.agent.md
+  )
+
+  for required_file in "${required_files[@]}"; do
+    if [[ ! -f "$target/$required_file" ]]; then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+asset_matches_source() {
+  local asset="$1"
+  local source_path="$2"
+  local target_path="$3"
+
+  case "$asset" in
+    .github/agents)
+      diff -qr --exclude='speckit.*.agent.md' "$source_path" "$target_path" >/dev/null 2>&1
+      ;;
+    .github/prompts)
+      diff -qr --exclude='speckit.*.prompt.md' "$source_path" "$target_path" >/dev/null 2>&1
+      ;;
+    *)
+      diff -qr "$source_path" "$target_path" >/dev/null 2>&1
+      ;;
+  esac
+}
+
+collect_asset_state() {
+  local resolved_source="$1"
+  local asset
+
+  ASSET_CURRENT=()
+  ASSET_MISSING=()
+  ASSET_OUTDATED=()
+
+  for asset in "${assets[@]}"; do
+    if [[ ! -d "$target_dir/$asset" ]]; then
+      ASSET_MISSING+=("$asset")
+    elif asset_matches_source "$asset" "$resolved_source/$asset" "$target_dir/$asset"; then
+      ASSET_CURRENT+=("$asset")
+    else
+      ASSET_OUTDATED+=("$asset")
+    fi
+  done
+}
+
+target_arg() {
+  if [[ "$target_dir" == "$PWD" ]]; then
+    printf '.\n'
+    return
+  fi
+
+  printf '%s\n' "$target_dir"
+}
+
+build_kite_command() {
+  local -a cmd=(kite)
+  local target
+
+  cmd+=("$@")
+
+  if [[ -n "$speckit_version" ]]; then
+    cmd+=(--speckit-version "$speckit_version")
+  fi
+
+  if [[ -n "$source_dir" ]]; then
+    cmd+=(--source-dir "$source_dir")
+  else
+    if [[ "$repo" != "$default_repo" ]]; then
+      cmd+=(--repo "$repo")
+    fi
+    if [[ "$ref" != "$default_ref" ]]; then
+      cmd+=(--ref "$ref")
+    fi
+  fi
+
+  target="$(target_arg)"
+  cmd+=("$target")
+  shell_join "${cmd[@]}"
+}
+
+build_post_create_command() {
+  local script_path="$target_dir/.devcontainer/post-create.sh"
+
+  if [[ "$target_dir" == "$PWD" ]]; then
+    script_path=".devcontainer/post-create.sh"
+  fi
+
+  shell_join bash "$script_path"
+}
+
+run_install_action() {
+  local -a installer_args=(--with-speckit --speckit-only)
+
+  if [[ $force_speckit_init -eq 1 ]]; then
+    installer_args+=(--force-speckit-init)
+  fi
+
+  if [[ -n "$speckit_version" ]]; then
+    installer_args+=(--speckit-version "$speckit_version")
+  fi
+
+  installer_args+=(--repo "$repo" --ref "$ref" "$target_dir")
+
+  if [[ -n "$source_dir" ]]; then
+    installer_args=("${installer_args[@]:0:${#installer_args[@]}-3}" --source-dir "$source_dir" "$target_dir")
+    bash "$source_dir/install.sh" "${installer_args[@]}"
+    return
+  fi
+
+  require_command curl
+  curl -fsSL "https://raw.githubusercontent.com/${repo}/${ref}/install.sh" | bash -s -- "${installer_args[@]}"
+}
+
+run_update_action() {
+  local -a installer_args=(--force)
+
+  if [[ $dry_run -eq 1 ]]; then
+    installer_args+=(--dry-run)
+  fi
+  if [[ $with_speckit -eq 1 ]]; then
+    installer_args+=(--with-speckit)
+  fi
+  if [[ $force_speckit_init -eq 1 ]]; then
+    installer_args+=(--force-speckit-init)
+  fi
+  if [[ -n "$speckit_version" ]]; then
+    installer_args+=(--speckit-version "$speckit_version")
+  fi
+
+  installer_args+=(--repo "$repo" --ref "$ref" "$target_dir")
+
+  if [[ -n "$source_dir" ]]; then
+    installer_args=("${installer_args[@]:0:${#installer_args[@]}-3}" --source-dir "$source_dir" "$target_dir")
+    bash "$source_dir/install.sh" "${installer_args[@]}"
+    return
+  fi
+
+  require_command curl
+  curl -fsSL "https://raw.githubusercontent.com/${repo}/${ref}/install.sh" | bash -s -- "${installer_args[@]}"
+}
+
+run_status() {
+  local resolved_source speckit_state asset workspace_status speckit_status preset_state workflow_state source_label
+
+  resolved_source="$(resolve_source_root)"
+  collect_asset_state "$resolved_source"
+
+  if has_speckit_bootstrap "$target_dir"; then
+    speckit_state="bootstrapped"
+  elif [[ -d "$target_dir/.specify" ]]; then
+    speckit_state="partial"
+  else
+    speckit_state="missing"
+  fi
+
+  if (( ${#ASSET_MISSING[@]} == 0 && ${#ASSET_OUTDATED[@]} == 0 )); then
+    workspace_status="current"
+  else
+    workspace_status="needs-refresh"
+  fi
+
+  if [[ "$speckit_state" == "bootstrapped" ]]; then
+    speckit_status="ready"
+    preset_state="installed"
+    workflow_state="installed"
+  elif [[ "$speckit_state" == "partial" ]]; then
+    speckit_status="action-needed"
+    preset_state="incomplete"
+    workflow_state="incomplete"
+  else
+    speckit_status="action-needed"
+    preset_state="missing"
+    workflow_state="missing"
+  fi
+
+  if [[ -n "$source_dir" ]]; then
+    source_label="$resolved_source"
+  else
+    source_label="${repo}@${ref}"
+  fi
+
+  if [[ $status_json -eq 1 ]]; then
+    printf '{'
+    printf '"target":'
+    json_escape "$target_dir"
+    printf ','
+    printf '"source":'
+    json_escape "$source_label"
+    printf ','
+    printf '"assets":{'
+    printf '"current":'
+    json_array "${ASSET_CURRENT[@]}"
+    printf ','
+    printf '"missing":'
+    json_array "${ASSET_MISSING[@]}"
+    printf ','
+    printf '"outdated":'
+    json_array "${ASSET_OUTDATED[@]}"
+    printf '},'
+    printf '"workspaceStatus":'
+    json_escape "$workspace_status"
+    printf ','
+    printf '"speckit":{'
+    printf '"state":'
+    json_escape "$speckit_state"
+    printf ','
+    printf '"preset":'
+    json_escape "$preset_state"
+    printf ','
+    printf '"workflow":'
+    json_escape "$workflow_state"
+    printf ','
+    printf '"status":'
+    json_escape "$speckit_status"
+    printf '}'
+    printf '}\n'
+    return
+  fi
+
+  echo "Target: $target_dir"
+  echo "Source: $source_label"
+  echo ""
+  echo "Workspace assets:"
+  for asset in "${assets[@]}"; do
+    if [[ " ${ASSET_CURRENT[*]} " == *" $asset "* ]]; then
+      echo "  current  $asset"
+    elif [[ " ${ASSET_OUTDATED[*]} " == *" $asset "* ]]; then
+      echo "  outdated $asset"
+    else
+      echo "  missing  $asset"
+    fi
+  done
+  echo ""
+  echo "Spec Kit: $speckit_state"
+
+  echo "  preset:   $preset_state"
+  echo "  workflow: $workflow_state"
+
+  echo ""
+  echo "Workspace status: ${workspace_status//-/ }"
+  echo "Speckit status: ${speckit_status//-/ }"
+}
+
+run_doctor() {
+  local resolved_source issues=0 speckit_fix
+
+  resolved_source="$(resolve_source_root)"
+  collect_asset_state "$resolved_source"
+
+  echo "Doctor target: $target_dir"
+
+  if command -v uv >/dev/null 2>&1; then
+    echo "[ok] uv is available"
+  else
+    echo "[warn] uv is missing"
+    echo "       Fix: $(build_post_create_command)"
+    issues=1
+  fi
+
+  if command -v uvx >/dev/null 2>&1 || command -v specify >/dev/null 2>&1; then
+    echo "[ok] Spec Kit runtime is available (uvx or specify)"
+  else
+    echo "[warn] neither uvx nor specify is available"
+    echo "       Fix: $(build_post_create_command)"
+    issues=1
+  fi
+
+  if (( ${#ASSET_MISSING[@]} == 0 && ${#ASSET_OUTDATED[@]} == 0 )); then
+    echo "[ok] workspace assets are current"
+  else
+    if (( ${#ASSET_MISSING[@]} > 0 )); then
+      echo "[warn] workspace assets are missing: ${ASSET_MISSING[*]}"
+    fi
+    if (( ${#ASSET_OUTDATED[@]} > 0 )); then
+      echo "[warn] workspace assets are outdated: ${ASSET_OUTDATED[*]}"
+    fi
+    echo "       Fix: $(build_kite_command update workspace)"
+    issues=1
+  fi
+
+  if has_speckit_bootstrap "$target_dir"; then
+    echo "[ok] bundled Spec Kit preset, commands, workflow, and agents are installed"
+  elif [[ -d "$target_dir/.specify" ]]; then
+    speckit_fix="$(build_kite_command install speckit --force-speckit-init)"
+    echo "[warn] .specify exists, but the bundled Spec Kit preset/workflow is incomplete"
+    echo "       Fix: $speckit_fix"
+    issues=1
+  else
+    speckit_fix="$(build_kite_command install speckit)"
+    echo "[warn] bundled Spec Kit is not bootstrapped"
+    echo "       Fix: $speckit_fix"
+    issues=1
+  fi
+
+  if [[ $issues -eq 0 ]]; then
+    echo "Doctor status: ready"
+    return 0
+  fi
+
+  echo "Doctor status: action needed"
+  return 1
+}
+
+normalize_target_dir() {
+  target_dir="$(cd "$target_dir" 2>/dev/null && pwd || true)"
+
+  if [[ -z "$target_dir" || ! -d "$target_dir" ]]; then
+    echo "Target directory does not exist." >&2
+    exit 1
+  fi
+}
+
+parse_help_target() {
+  local first="${1:-}"
+  local second="${2:-}"
+
+  case "$first $second" in
+    "install speckit")
+      show_help "install-speckit"
+      ;;
+    "update workspace")
+      show_help "update-workspace"
+      ;;
+    "doctor "|"doctor")
+      show_help "doctor"
+      ;;
+    "status "|"status")
+      show_help "status"
+      ;;
+    *)
+      show_help "general"
+      ;;
+  esac
+}
+
+main() {
+  local primary_command="${1:-}"
+  local secondary_command="${2:-}"
+
+  if [[ -z "$primary_command" || "$primary_command" == "-h" || "$primary_command" == "--help" ]]; then
+    show_help "general"
+    exit 0
+  fi
+
+  if [[ "$primary_command" == "help" ]]; then
+    parse_help_target "$secondary_command" "${3:-}"
+    exit 0
+  fi
+
+  if [[ "$primary_command" == "speckit" && "$secondary_command" == "install" ]]; then
+    primary_command="install"
+    secondary_command="speckit"
+  fi
+
+  case "$primary_command" in
+    install)
+      if [[ "$secondary_command" != "speckit" ]]; then
+        echo "Unknown command: ${primary_command} ${secondary_command}" >&2
+        show_help "general" >&2
+        exit 1
+      fi
+      mode="install-speckit"
+      shift 2
+      ;;
+    update)
+      if [[ "$secondary_command" != "workspace" ]]; then
+        echo "Unknown command: ${primary_command} ${secondary_command}" >&2
+        show_help "general" >&2
+        exit 1
+      fi
+      mode="update-workspace"
+      shift 2
+      ;;
+    doctor)
+      mode="doctor"
+      shift 1
+      ;;
+    status)
+      mode="status"
+      shift 1
+      ;;
+    *)
+      echo "Unknown command: ${primary_command} ${secondary_command}" >&2
+      show_help "general" >&2
+      exit 1
+      ;;
+  esac
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run)
+        if [[ "$mode" != "update-workspace" ]]; then
+          echo "Unknown option: $1" >&2
+          show_help "$mode" >&2
+          exit 1
+        fi
+        dry_run=1
+        shift
+        ;;
+      --with-speckit)
+        if [[ "$mode" != "update-workspace" ]]; then
+          echo "Unknown option: $1" >&2
+          show_help "$mode" >&2
+          exit 1
+        fi
+        with_speckit=1
+        shift
+        ;;
+      --json)
+        if [[ "$mode" != "status" ]]; then
+          echo "Unknown option: $1" >&2
+          show_help "$mode" >&2
+          exit 1
+        fi
+        status_json=1
+        shift
+        ;;
+      --force-speckit-init)
+        if [[ "$mode" != "install-speckit" && "$mode" != "update-workspace" ]]; then
+          echo "Unknown option: $1" >&2
+          show_help "$mode" >&2
+          exit 1
+        fi
+        force_speckit_init=1
+        shift
+        ;;
+      --speckit-version)
+        speckit_version="${2:?Missing value for --speckit-version}"
+        shift 2
+        ;;
+      --repo)
+        repo="${2:?Missing value for --repo}"
+        shift 2
+        ;;
+      --ref)
+        ref="${2:?Missing value for --ref}"
+        shift 2
+        ;;
+      --source-dir)
+        source_dir="${2:?Missing value for --source-dir}"
+        shift 2
+        ;;
+      -h|--help)
+        show_help "$mode"
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -* )
+        echo "Unknown option: $1" >&2
+        show_help "$mode" >&2
+        exit 1
+        ;;
+      *)
+        target_dir="$1"
+        shift
+        ;;
+    esac
+  done
+
+  if [[ $# -gt 0 ]]; then
+    echo "Unexpected arguments: $*" >&2
+    show_help "$mode" >&2
+    exit 1
+  fi
+
+  normalize_target_dir
+
+  case "$mode" in
+    install-speckit)
+      run_install_action
+      ;;
+    update-workspace)
+      run_update_action
+      ;;
+    doctor)
+      run_doctor
+      ;;
+    status)
+      run_status
+      ;;
+  esac
+}
+
+main "$@"
