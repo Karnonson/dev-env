@@ -15,7 +15,7 @@ Bootstrap GitHub Spec Kit in the current workspace and align the repo-local rule
 - Default Spec Kit version: `v0.7.0`
 - Default branch numbering: `sequential`
 - Default AI target for Spec Kit init: `copilot`
-- Default preset path: `~/.config/Code/User/spec-kit-presets/orchestrator-workflow`
+- Preferred preset source: workspace-local `spec-kit/presets/orchestrator-workflow` when available, otherwise `~/.config/Code/User/spec-kit-presets/orchestrator-workflow`
 
 If I added extra text after this prompt, treat it as overrides or notes. Respect explicit overrides such as `version=...` or `branch-numbering=timestamp`.
 
@@ -45,10 +45,11 @@ Before changing anything:
 - Check whether the repo already defines its own workflow agent. If it does, do not change it unless the user explicitly asks.
 
 If Spec Kit is already installed, do **not** reinitialize it unless the user explicitly asks. In that case, only apply the repo-local alignment layer.
+If `.specify/` exists but the expected Speckit command files are missing, treat that as a partial or customized install. Surface the state to the user and ask before reinitializing.
 
 ### 2. Install Spec Kit when missing
 
-If `.specify/` is missing or the core Speckit commands are not present, initialize Spec Kit in the current workspace.
+If `.specify/` is missing, initialize Spec Kit in the current workspace.
 
 Preferred command:
 
@@ -68,17 +69,21 @@ Operational rules:
 
 ### 2.5 Install my local preset when available
 
-If the local preset exists at `~/.config/Code/User/spec-kit-presets/orchestrator-workflow/preset.yml`:
+If a workspace-local preset exists at `spec-kit/presets/orchestrator-workflow/preset.yml`, prefer it.
+
+Otherwise, if the user-level preset exists at `~/.config/Code/User/spec-kit-presets/orchestrator-workflow/preset.yml`, use that.
+
+When a preset source exists:
 
 - Check whether `orchestrator-workflow` is already installed with `specify preset list`.
 - If it is not installed, run:
 
 ```bash
-specify preset add --dev ~/.config/Code/User/spec-kit-presets/orchestrator-workflow --priority 1
+specify preset add --dev <preset-path> --priority 1
 ```
 
 - If it is already installed, leave it in place.
-- If the preset directory does not exist, continue without failing and report that the workspace is running without the local preset.
+- If neither preset directory exists, continue without failing and report that the workspace is running without the custom preset.
 
 ### 3. Align the repo with my custom agents
 

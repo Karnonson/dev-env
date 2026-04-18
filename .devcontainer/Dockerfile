@@ -41,3 +41,19 @@ RUN apt-get update \
         libnss3 \
         xdg-utils \
     && rm -rf /var/lib/apt/lists/*
+
+FROM base AS fullstack
+
+ENV DEVCONTAINER_PROFILE=fullstack
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libffi-dev \
+        libpq-dev \
+        libssl-dev \
+        sqlite3 \
+        libgbm1 \
+        libgtk-3-0 \
+        libnss3 \
+        xdg-utils \
+    && rm -rf /var/lib/apt/lists/*

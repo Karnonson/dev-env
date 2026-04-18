@@ -1,10 +1,11 @@
 # Dev Container Profiles
 
-This workspace uses one dev container entrypoint with three Docker build targets.
+This workspace uses one dev container entrypoint with four Docker build targets.
 
 - `base`: Shared tooling for mixed Python and TypeScript repositories.
 - `python`: `base` plus common native libraries for Python web apps and agent backends.
 - `typescript`: `base` plus extra browser-related system libraries for TypeScript web apps.
+- `fullstack`: `base` plus both Python native libraries and browser system libraries.
 
 The active profile is the `target` value in `.devcontainer/devcontainer.json`.
 
@@ -15,6 +16,7 @@ On Linux, switch profiles with:
 ```bash
 bash .devcontainer/switch-profile.sh python
 bash .devcontainer/switch-profile.sh typescript
+bash .devcontainer/switch-profile.sh fullstack
 bash .devcontainer/switch-profile.sh base
 ```
 

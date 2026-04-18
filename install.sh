@@ -6,22 +6,17 @@ default_repo="Karnonson/dev-env"
 default_ref="main"
 repo="$default_repo"
 ref="$default_ref"
-
-# Read pinned version from .speckit-version if available (local or downloaded source)
-default_speckit_version="0.7.0"
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "$script_dir/.speckit-version" ]]; then
-  default_speckit_version="$(tr -d '[:space:]' < "$script_dir/.speckit-version")"
-fi
-speckit_version="${DEV_ENV_SPECKIT_VERSION:-$default_speckit_version}"
 force=0
 with_speckit=0
 dry_run=0
+force_speckit_init=0
 target_dir="."
 source_dir="${DEV_ENV_SOURCE_DIR:-}"
+default_speckit_version="0.7.0"
+speckit_version=""
 
 usage() {
-  cat <<'EOF'
+  cat <<EOF
 Usage: install.sh [options] [target-directory]
 
 Install the dev-env .devcontainer and .vscode-prompts assets into a target project.
@@ -30,7 +25,8 @@ Options:
   --force             Replace existing .devcontainer and .vscode-prompts
   --dry-run           Show what would be installed without writing anything
   --with-speckit      Initialize Spec Kit and install the bundled preset/workflow
-  --speckit-version V Pin the Spec Kit CLI version used for bootstrap (default: 0.7.0)
+  --force-speckit-init Reinitialize Spec Kit when .specify already exists
+  --speckit-version V Pin the Spec Kit CLI version used for bootstrap (default: $default_speckit_version)
   --ref REF           Git ref to download from (default: main)
   --repo OWNER/REPO   GitHub repo to download from (default: Karnonson/dev-env)
   --source-dir PATH   Use a local dev-env checkout instead of downloading
@@ -40,7 +36,8 @@ Examples:
   ./install.sh .
   ./install.sh --dry-run .
   ./install.sh --with-speckit .
-  ./install.sh --with-speckit --speckit-version 0.7.0 .
+  ./install.sh --with-speckit --force-speckit-init .
+  ./install.sh --with-speckit --speckit-version $default_speckit_version .
   ./install.sh --force ../my-project
   curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
 EOF
@@ -61,6 +58,22 @@ get_local_specify_version() {
   specify version 2>/dev/null | sed -nE 's/.*CLI Version[[:space:]]+([0-9.]+).*/\1/p' | head -n 1
 }
 
+has_speckit_templates() {
+  local command_file
+
+  if [[ ! -d "$target_dir/.specify" ]]; then
+    return 1
+  fi
+
+  while IFS= read -r command_file; do
+    if [[ -n "$command_file" ]]; then
+      return 0
+    fi
+  done < <(find "$target_dir/.github" -type f \( -name 'speckit.*.agent.md' -o -name 'speckit.*.prompt.md' \) -print 2>/dev/null)
+
+  return 1
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --force)
@@ -73,6 +86,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --with-speckit)
       with_speckit=1
+      shift
+      ;;
+    --force-speckit-init)
+      force_speckit_init=1
       shift
       ;;
     --speckit-version)
@@ -133,7 +150,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-find_first_extracted_dir() {
+find_extracted_source_root() {
+  local devcontainer_dir
+
+  devcontainer_dir="$(find "$temp_dir" -mindepth 2 -maxdepth 4 -type d -name .devcontainer | head -n 1 || true)"
+  if [[ -n "$devcontainer_dir" ]]; then
+    dirname "$devcontainer_dir"
+    return
+  fi
+
   find "$temp_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1
 }
 
@@ -184,20 +209,24 @@ resolve_source_root() {
 
   temp_dir="$(mktemp -d)"
   archive_path="$temp_dir/dev-env.tar.gz"
-  archive_url="https://github.com/${repo}/archive/${ref}.tar.gz"
+  archive_url="${DEV_ENV_ARCHIVE_URL:-https://github.com/${repo}/archive/${ref}.tar.gz}"
 
-  echo "Downloading ${repo}@${ref}..."
+  echo "Downloading ${repo}@${ref}..." >&2
   curl -fsSL "$archive_url" -o "$archive_path"
   tar -xzf "$archive_path" -C "$temp_dir"
 
-  find_first_extracted_dir
+  find_extracted_source_root
 }
 
 bootstrap_speckit() {
   local preset_dir workflow_path
 
-  if [[ -d "$target_dir/.specify" ]]; then
+  if has_speckit_templates; then
     echo "Spec Kit already exists in $target_dir; skipping initialization."
+  elif [[ -d "$target_dir/.specify" && $force_speckit_init -ne 1 ]]; then
+    echo "Existing .specify detected in $target_dir, but core Speckit command files were not found." >&2
+    echo "Refusing to reinitialize automatically. Re-run with --force-speckit-init if you want to replace the existing Spec Kit state." >&2
+    exit 1
   else
     (
       cd "$target_dir"
@@ -205,17 +234,17 @@ bootstrap_speckit() {
     )
   fi
 
-  preset_dir="spec-kit/presets/orchestrator-workflow"
-  workflow_path="spec-kit/workflows/orchestrator-design-first.yml"
+  preset_dir="$source_root/spec-kit/presets/orchestrator-workflow"
+  workflow_path="$source_root/spec-kit/workflows/orchestrator-design-first.yml"
 
-  if [[ -f "$target_dir/$preset_dir/preset.yml" ]]; then
+  if [[ -f "$preset_dir/preset.yml" ]]; then
     (
       cd "$target_dir"
       run_speckit preset add --dev "$preset_dir" --priority 1
     )
   fi
 
-  if [[ -f "$target_dir/$workflow_path" ]]; then
+  if [[ -f "$workflow_path" ]]; then
     (
       cd "$target_dir"
       run_speckit workflow add "$workflow_path"
@@ -225,17 +254,60 @@ bootstrap_speckit() {
 
 source_root="$(resolve_source_root)"
 
+if [[ -f "$source_root/.speckit-version" ]]; then
+  default_speckit_version="$(tr -d '[:space:]' < "$source_root/.speckit-version")"
+fi
+
+if [[ -z "$speckit_version" ]]; then
+  speckit_version="${DEV_ENV_SPECKIT_VERSION:-$default_speckit_version}"
+fi
+
 # Validate source directories
-for asset in .devcontainer .vscode-prompts spec-kit; do
+for asset in .devcontainer .vscode-prompts; do
   if [[ ! -d "$source_root/$asset" ]]; then
     echo "Missing required directory in source: $asset" >&2
     exit 1
   fi
 done
 
+if [[ $with_speckit -eq 1 && ! -d "$source_root/spec-kit" ]]; then
+  echo "Missing required directory in source: spec-kit (needed for --with-speckit)" >&2
+  exit 1
+fi
+
+# Dry-run: report what would happen and exit
+if [[ $dry_run -eq 1 ]]; then
+  echo "Dry run - the following would be installed into $target_dir:"
+  for asset in .devcontainer .vscode-prompts; do
+    if [[ -e "$target_dir/$asset" ]]; then
+      echo "  replace $asset"
+    else
+      echo "  create  $asset"
+    fi
+  done
+  if [[ $with_speckit -eq 1 ]]; then
+    if has_speckit_templates; then
+      echo "  skip    .specify bootstrap (already initialized)"
+    elif [[ -d "$target_dir/.specify" && $force_speckit_init -ne 1 ]]; then
+      echo "  skip    .specify bootstrap (existing .specify preserved; use --force-speckit-init to reinitialize)"
+    else
+      echo "  create  .specify bootstrap files via specify init"
+    fi
+    echo "  install preset: orchestrator-workflow -> .specify/presets/"
+    echo "  install workflow: orchestrator-design-first -> .specify/workflows/"
+  fi
+  exit 0
+fi
+
+if [[ $with_speckit -eq 1 && -d "$target_dir/.specify" && $force_speckit_init -ne 1 ]] && ! has_speckit_templates; then
+  echo "Existing .specify detected in $target_dir, but core Speckit command files were not found." >&2
+  echo "Refusing to reinitialize automatically. Re-run with --force-speckit-init if you want to replace the existing Spec Kit state." >&2
+  exit 1
+fi
+
 # Collect all conflicts before failing
 conflicts=()
-for asset in .devcontainer .vscode-prompts spec-kit; do
+for asset in .devcontainer .vscode-prompts; do
   if [[ -e "$target_dir/$asset" && $force -ne 1 ]]; then
     conflicts+=("$target_dir/$asset")
   fi
@@ -247,30 +319,8 @@ if (( ${#conflicts[@]} )); then
   exit 1
 fi
 
-# Dry-run: report what would happen and exit
-if [[ $dry_run -eq 1 ]]; then
-  echo "Dry run — the following would be installed into $target_dir:"
-  for asset in .devcontainer .vscode-prompts spec-kit; do
-    if [[ -e "$target_dir/$asset" ]]; then
-      echo "  replace $asset"
-    else
-      echo "  create  $asset"
-    fi
-  done
-  if [[ $with_speckit -eq 1 ]]; then
-    if [[ -d "$target_dir/.specify" ]]; then
-      echo "  skip    .specify (already exists)"
-    else
-      echo "  create  .specify (Spec Kit init)"
-    fi
-    echo "  install preset: orchestrator-workflow → .specify/presets/"
-    echo "  install workflow: orchestrator-design-first → .specify/workflows/"
-  fi
-  exit 0
-fi
-
 # Copy assets to target
-for asset in .devcontainer .vscode-prompts spec-kit; do
+for asset in .devcontainer .vscode-prompts; do
   if [[ -e "$target_dir/$asset" ]]; then
     rm -rf "$target_dir/$asset"
   fi

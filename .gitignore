@@ -205,3 +205,27 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Node / TypeScript
+node_modules/
+dist/
+.next/
+.nuxt/
+.output/
+.turbo/
+.vercel/
+*.tsbuildinfo
+.eslintcache
+
+# Local dotfiles (user home when dev-env is checked out at ~)
+.bash_profile
+.bashrc
+.gitconfig
+.gitmodules
+.mcp.json
+.profile
+.ripgreprc
+.zprofile
+.zshrc
+.idea/
+.vscode/

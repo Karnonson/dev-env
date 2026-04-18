@@ -5,10 +5,10 @@ set -euo pipefail
 profile="${1:-}"
 
 case "$profile" in
-  base|python|typescript)
+  base|python|typescript|fullstack)
     ;;
   *)
-    echo "Usage: bash .devcontainer/switch-profile.sh {base|python|typescript}" >&2
+    echo "Usage: bash .devcontainer/switch-profile.sh {base|python|typescript|fullstack}" >&2
     exit 1
     ;;
 esac

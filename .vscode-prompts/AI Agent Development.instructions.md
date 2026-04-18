@@ -12,7 +12,7 @@ An AI agent is, at its core, a system equipped with:
 - **Hands**: Tools that allow the agent to perform actions and interact with external systems or APIs.
 
 ## Framework Selection
-- **Prefer Existing Frameworks**: Instead of building custom orchestration code from scratch, strongly prefer using an established AI agent framework (e.g., ADK, Mastra, LangChain, etc.). If the project is a Node.js workspace, **Mastra** should be the preferred choice.
+- **Prefer Existing Frameworks**: Instead of building custom orchestration code from scratch, strongly prefer using an established AI agent framework when it fits the project's stack, operational constraints, and maintenance model.
 - **User Confirmation Required**: The selection of a specific framework MUST be presented to and confirmed by the user before proceeding.
 - **Stack Compatibility**: Ensure the recommended framework integrates smoothly with the project's existing technology stack, if applicable.
 

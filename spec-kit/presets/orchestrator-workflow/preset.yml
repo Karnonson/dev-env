@@ -1,0 +1,48 @@
+schema_version: "1.0"
+
+preset:
+  id: "orchestrator-workflow"
+  name: "Orchestrator Workflow"
+  version: "1.0.0"
+  description: "Design-aware Speckit customization with question-first constitution setup and split implementation guidance."
+  author: "Karnon"
+  repository: "https://github.com/Karnonson/dev-env"
+  license: "MIT"
+
+requires:
+  speckit_version: ">=0.6.0"
+
+provides:
+  templates:
+    - type: "command"
+      name: "speckit.constitution"
+      file: "commands/speckit.constitution.md"
+      description: "Question-first constitution setup tailored to project preferences"
+      replaces: "speckit.constitution"
+
+    - type: "command"
+      name: "speckit.design"
+      file: "commands/speckit.design.md"
+      description: "Capture UI and design-system direction before feature specification"
+
+    - type: "command"
+      name: "speckit.implement"
+      file: "commands/speckit.implement.md"
+      description: "Coordinate implementation through backend and UI specialists"
+      replaces: "speckit.implement"
+
+    - type: "command"
+      name: "speckit.implement.backend"
+      file: "commands/speckit.implement.backend.md"
+      description: "Implement backend tasks from the active Speckit feature"
+
+    - type: "command"
+      name: "speckit.implement.ui"
+      file: "commands/speckit.implement.ui.md"
+      description: "Implement UI tasks from the active Speckit feature"
+
+tags:
+  - "workflow"
+  - "design"
+  - "copilot"
+  - "speckit"
