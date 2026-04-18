@@ -5,17 +5,17 @@ Reusable development container template for future projects.
 This repository packages three things together:
 
 - a multi-profile `.devcontainer/` setup for base, Python, TypeScript, and fullstack work
-- repo-managed VS Code chat customizations in `.vscode-prompts/`
+- workspace-managed VS Code chat customizations in `.github/prompts/`
 - repo-managed Speckit preset and workflow assets in `spec-kit/`
 
-When a future project reuses this repository's dev container files, the container post-create step installs the bundled custom agents, instructions, and prompts into the container user's VS Code prompt directories automatically.
+When a future project uses this repository's dev container setup, VS Code automatically detects and loads the bundled custom agents, instructions, and prompts without needing any installation steps.
 
-The installer copies only `.devcontainer/` and `.vscode-prompts/` into the target project. Speckit presets and workflows are installed directly into `.specify/` without leaving a separate `spec-kit/` directory in the target repo.
+The installer copies only `.devcontainer/` and `.github/prompts/` into the target project. Speckit presets and workflows are installed directly into `.specify/` without leaving a separate `spec-kit/` directory in the target repo.
 
 ## Repository Layout
 
 - `.devcontainer/`: container build, bootstrap, and profile-switching scripts
-- `.vscode-prompts/`: source-controlled VS Code user customizations copied into the container on create
+- `.github/prompts/`: workspace-scoped VS Code user customizations
 - `spec-kit/`: bundled Speckit preset and custom workflow assets
 - `extras/`: optional prompts and customizations not installed by default
 - `.speckit-version`: pinned Speckit CLI version used by the installer and CI
@@ -29,7 +29,7 @@ From the target repository root:
 curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
 ```
 
-This installs `.devcontainer/` and `.vscode-prompts/` into the current project.
+This installs `.devcontainer/` and `.github/prompts/` into the current project.
 
 If those directories already exist and you want to replace them:
 
@@ -65,15 +65,9 @@ Instructions files do not become slash commands. They are applied automatically 
 
 ## Update Bundled Customizations
 
-Edit the files under `.vscode-prompts/` in this repository.
+Edit the files under `.github/prompts/` in this repository.
 
-To re-install them inside an already running container:
-
-```bash
-bash .devcontainer/install-vscode-prompts.sh
-```
-
-If you use a non-default VS Code profile, the installer also copies the files into profile-scoped user-data folders when they exist.
+Modifications to these files are picked up by VS Code automatically, as they are part of the workspace context. No installation script is necessary!
 
 ## Troubleshooting Chat Customizations
 
@@ -81,7 +75,7 @@ If the files were installed but you do not see them in chat:
 
 1. Open `Chat: Open Chat Customizations` and verify the prompts, agents, or instructions appear there.
 2. In the Chat view, open the context menu and use Diagnostics to see any loading errors.
-3. Re-run `bash .devcontainer/install-vscode-prompts.sh` inside the container, then reload the VS Code window.
+3. Reload the VS Code window.
 4. Confirm you are checking the right UI surface:
    - prompt files: slash commands
    - custom agents: agent picker
@@ -95,7 +89,7 @@ bash install.sh --help
 
 Supported options:
 
-- `--force`: replace existing `.devcontainer/` and `.vscode-prompts/`
+- `--force`: replace existing `.devcontainer/` and `.github/prompts/`
 - `--dry-run`: show what would be installed without writing anything
 - `--with-speckit`: initialize Spec Kit and install the bundled preset and workflow
 - `--force-speckit-init`: reinitialize Spec Kit even when `.specify/` already exists

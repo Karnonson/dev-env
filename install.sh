@@ -19,10 +19,10 @@ usage() {
   cat <<EOF
 Usage: install.sh [options] [target-directory]
 
-Install the dev-env .devcontainer and .vscode-prompts assets into a target project.
+Install the dev-env .devcontainer and .github/prompts assets into a target project.
 
 Options:
-  --force             Replace existing .devcontainer and .vscode-prompts
+  --force             Replace existing .devcontainer and .github/prompts
   --dry-run           Show what would be installed without writing anything
   --with-speckit      Initialize Spec Kit and install the bundled preset/workflow
   --force-speckit-init Reinitialize Spec Kit when .specify already exists
@@ -269,7 +269,7 @@ if [[ -z "$speckit_version" ]]; then
 fi
 
 # Validate source directories
-for asset in .devcontainer .vscode-prompts; do
+for asset in .devcontainer .github/prompts; do
   if [[ ! -d "$source_root/$asset" ]]; then
     echo "Missing required directory in source: $asset" >&2
     exit 1
@@ -284,7 +284,7 @@ fi
 # Dry-run: report what would happen and exit
 if [[ $dry_run -eq 1 ]]; then
   echo "Dry run - the following would be installed into $target_dir:"
-  for asset in .devcontainer .vscode-prompts; do
+  for asset in .devcontainer .github/prompts; do
     if [[ -e "$target_dir/$asset" ]]; then
       echo "  replace $asset"
     else
@@ -313,7 +313,7 @@ fi
 
 # Collect all conflicts before failing
 conflicts=()
-for asset in .devcontainer .vscode-prompts; do
+for asset in .devcontainer .github/prompts; do
   if [[ -e "$target_dir/$asset" && $force -ne 1 ]]; then
     conflicts+=("$target_dir/$asset")
   fi
@@ -326,7 +326,7 @@ if (( ${#conflicts[@]} )); then
 fi
 
 # Copy assets to target
-for asset in .devcontainer .vscode-prompts; do
+for asset in .devcontainer .github/prompts; do
   if [[ -e "$target_dir/$asset" ]]; then
     rm -rf "$target_dir/$asset"
   fi
