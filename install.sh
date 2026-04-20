@@ -156,9 +156,7 @@ if [[ $speckit_only -eq 1 && $with_speckit -ne 1 ]]; then
   exit 1
 fi
 
-target_dir="$(cd "$target_dir" 2>/dev/null && pwd || true)"
-
-if [[ -z "$target_dir" || ! -d "$target_dir" ]]; then
+if ! target_dir="$(cd -- "$target_dir" 2>/dev/null && pwd)"; then
   echo "Target directory does not exist." >&2
   exit 1
 fi
@@ -189,9 +187,21 @@ asset_merges_missing_by_default() {
 merge_missing_tree() {
   local source_path="$1"
   local target_path="$2"
+  local source_entry rel_path target_entry
 
   mkdir -p "$target_path"
-  cp -Rn "$source_path/." "$target_path/"
+
+  while IFS= read -r -d '' source_entry; do
+    rel_path="${source_entry#"$source_path"/}"
+    target_entry="$target_path/$rel_path"
+
+    if [[ -d "$source_entry" ]]; then
+      mkdir -p "$target_entry"
+    elif [[ ! -e "$target_entry" ]]; then
+      mkdir -p "$(dirname "$target_entry")"
+      cp -R "$source_entry" "$target_entry"
+    fi
+  done < <(find "$source_path" -mindepth 1 -print0)
 }
 
 replace_tree() {
@@ -331,9 +341,8 @@ run_speckit() {
 resolve_source_root() {
   if [[ -n "$source_dir" ]]; then
     local resolved_source
-    resolved_source="$(cd "$source_dir" 2>/dev/null && pwd || true)"
 
-    if [[ -z "$resolved_source" || ! -d "$resolved_source" ]]; then
+    if ! resolved_source="$(cd -- "$source_dir" 2>/dev/null && pwd)"; then
       echo "Source directory does not exist: $source_dir" >&2
       exit 1
     fi

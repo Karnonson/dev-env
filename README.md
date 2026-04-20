@@ -66,7 +66,7 @@ To install the environment and bootstrap Speckit in the target project too:
 curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- --with-speckit .
 ```
 
-*Note: The `--with-speckit` flag requires `uv` (specifically `uvx`) or `specify` to be installed on your machine. If you don't have those, you can run the basic install command on your host machine, rebuild the container, and then run the `--with-speckit` command from inside the container where `uv` is available by default.*
+_Note: The `--with-speckit` flag requires `uv` (specifically `uvx`) or `specify` to be installed on your machine. If you don't have those, you can run the basic install command on your host machine, rebuild the container, and then run the `--with-speckit` command from inside the container where `uv` is available by default._
 
 That creates `.specify/` plus the generated Speckit command files under `.github/` without copying `spec-kit/` into the target repository.
 

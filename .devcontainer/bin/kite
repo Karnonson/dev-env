@@ -4,7 +4,6 @@ set -euo pipefail
 
 default_repo="Karnonson/dev-env"
 default_ref="main"
-default_speckit_version="0.7.0"
 
 repo="$default_repo"
 ref="$default_ref"
@@ -419,8 +418,7 @@ resolve_source_root() {
   fi
 
   if [[ -n "$source_dir" ]]; then
-    source_root="$(cd "$source_dir" 2>/dev/null && pwd || true)"
-    if [[ -z "$source_root" || ! -d "$source_root" ]]; then
+    if ! source_root="$(cd -- "$source_dir" 2>/dev/null && pwd)"; then
       echo "Source directory does not exist: $source_dir" >&2
       exit 1
     fi
@@ -733,7 +731,9 @@ run_audit() {
     env_files="$(git -C "$target_dir" ls-files '*.env' '.env.*' 2>/dev/null | grep -v '.env.example' | grep -v '.env.template' || true)"
     if [[ -n "$env_files" ]]; then
       echo "[warn] Committed .env files detected (may contain secrets):"
-      echo "$env_files" | sed 's/^/  /'
+      while IFS= read -r env_file; do
+        printf '  %s\n' "$env_file"
+      done <<< "$env_files"
       exit_code=1
     else
       echo "[ok] No committed .env files with potential secrets"
@@ -1076,11 +1076,16 @@ bump_version() {
     current_version="$(grep -m1 '^version' "$target_dir/pyproject.toml" | sed 's/.*= *"\([^"]*\)".*/\1/' || true)"
   elif [[ -f "$target_dir/VERSION" ]]; then
     version_file="VERSION"
-    current_version="$(cat "$target_dir/VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
+    current_version="$(tr -d '[:space:]' < "$target_dir/VERSION" 2>/dev/null || true)"
   fi
 
   if [[ -z "$version_file" || -z "$current_version" ]]; then
     echo "[warn] No version source found (package.json, pyproject.toml, or VERSION file)" >&2
+    return 1
+  fi
+
+  if [[ ! "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "[warn] Version '$current_version' is not a standard X.Y.Z format; cannot bump safely" >&2
     return 1
   fi
 
@@ -1213,7 +1218,10 @@ run_release() {
       fi
       ;;
     pyproject.toml)
-      sed -i "s/^version = \"$current_version\"/version = \"$new_version\"/" "$target_dir/pyproject.toml"
+      local escaped_current escaped_new
+      escaped_current="$(printf '%s\n' "$current_version" | sed 's/[][\.^$*]/\\&/g')"
+      escaped_new="$(printf '%s\n' "$new_version" | sed 's/[&\\/]/\\&/g')"
+      sed -i "s/^version = \"${escaped_current}\"/version = \"${escaped_new}\"/" "$target_dir/pyproject.toml"
       ;;
     VERSION)
       printf '%s\n' "$new_version" > "$target_dir/VERSION"
@@ -1322,7 +1330,7 @@ run_install_action() {
   installer_args+=(--repo "$repo" --ref "$ref" "$target_dir")
 
   if [[ -n "$source_dir" ]]; then
-    installer_args=("${installer_args[@]:0:${#installer_args[@]}-3}" --source-dir "$source_dir" "$target_dir")
+    installer_args=("${installer_args[@]:0:${#installer_args[@]}-5}" --source-dir "$source_dir" "$target_dir")
     bash "$source_dir/install.sh" "${installer_args[@]}"
     return
   fi
@@ -1354,7 +1362,7 @@ run_update_action() {
   installer_args+=(--repo "$repo" --ref "$ref" "$target_dir")
 
   if [[ -n "$source_dir" ]]; then
-    installer_args=("${installer_args[@]:0:${#installer_args[@]}-3}" --source-dir "$source_dir" "$target_dir")
+    installer_args=("${installer_args[@]:0:${#installer_args[@]}-5}" --source-dir "$source_dir" "$target_dir")
     bash "$source_dir/install.sh" "${installer_args[@]}"
     return
   fi
@@ -1560,9 +1568,7 @@ run_doctor() {
 }
 
 normalize_target_dir() {
-  target_dir="$(cd "$target_dir" 2>/dev/null && pwd || true)"
-
-  if [[ -z "$target_dir" || ! -d "$target_dir" ]]; then
+  if ! target_dir="$(cd -- "$target_dir" 2>/dev/null && pwd)"; then
     echo "Target directory does not exist." >&2
     exit 1
   fi
@@ -1571,30 +1577,35 @@ normalize_target_dir() {
 parse_help_target() {
   local first="${1:-}"
   local second="${2:-}"
+  local target="$first"
 
-  case "$first $second" in
+  if [[ -n "$second" ]]; then
+    target+=" $second"
+  fi
+
+  case "$target" in
     "install speckit")
       show_help "install-speckit"
       ;;
     "update workspace")
       show_help "update-workspace"
       ;;
-    "doctor "|"doctor")
+    "doctor")
       show_help "doctor"
       ;;
-    "status "|"status")
+    "status")
       show_help "status"
       ;;
-    "test "|"test")
+    "test")
       show_help "test"
       ;;
-    "audit "|"audit")
+    "audit")
       show_help "audit"
       ;;
-    "new "|"new")
+    "new")
       show_help "new"
       ;;
-    "release "|"release")
+    "release")
       show_help "release"
       ;;
     "verify feature")
