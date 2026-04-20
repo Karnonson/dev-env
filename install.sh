@@ -15,6 +15,7 @@ target_dir="."
 source_dir="${DEV_ENV_SOURCE_DIR:-}"
 default_speckit_version="0.7.0"
 speckit_version=""
+bootstrap_temp_dir=""
 
 usage() {
   cat <<EOF
@@ -23,7 +24,7 @@ Usage: install.sh [options] [target-directory]
 Install the dev-env .devcontainer and workspace chat customization assets into a target project.
 
 Options:
-  --force             Replace existing .devcontainer, .github/prompts, .github/agents, and .github/instructions
+  --force             Replace existing .devcontainer, .github/prompts, .github/agents, .github/instructions, and copilot-instructions.md
   --dry-run           Show what would be installed without writing anything
   --with-speckit      Initialize Spec Kit and install the bundled preset/workflow
   --speckit-only      Only install Spec Kit assets; do not copy dev-env workspace files
@@ -70,6 +71,7 @@ has_speckit_templates() {
     .specify/presets/orchestrator-workflow/commands/speckit.implement.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
+    .specify/presets/orchestrator-workflow/commands/speckit.test.md
     .specify/workflows/orchestrator-design-first/workflow.yml
     .github/agents/speckit.constitution.agent.md
     .github/agents/speckit.design.agent.md
@@ -167,8 +169,119 @@ cleanup() {
   if [[ -n "$temp_dir" && -d "$temp_dir" ]]; then
     rm -rf "$temp_dir"
   fi
+  if [[ -n "$bootstrap_temp_dir" && -d "$bootstrap_temp_dir" ]]; then
+    rm -rf "$bootstrap_temp_dir"
+  fi
 }
 trap cleanup EXIT
+
+asset_merges_missing_by_default() {
+  case "$1" in
+    .github/prompts|.github/agents|.github/instructions|.github/copilot-instructions.md)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+merge_missing_tree() {
+  local source_path="$1"
+  local target_path="$2"
+
+  mkdir -p "$target_path"
+  cp -Rn "$source_path/." "$target_path/"
+}
+
+replace_tree() {
+  local source_path="$1"
+  local target_path="$2"
+
+  rm -rf "$target_path"
+  mkdir -p "$(dirname "$target_path")"
+  cp -R "$source_path" "$target_path"
+}
+
+merge_missing_file() {
+  local source_path="$1"
+  local target_path="$2"
+
+  mkdir -p "$(dirname "$target_path")"
+  if [[ ! -f "$target_path" ]]; then
+    cp "$source_path" "$target_path"
+  fi
+}
+
+ensure_git_main_branch_preference() {
+  local current_branch
+
+  if ! command -v git >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! git -C "$target_dir" rev-parse --git-dir >/dev/null 2>&1; then
+    return
+  fi
+
+  git -C "$target_dir" config --local init.defaultBranch main || true
+
+  current_branch="$(git -C "$target_dir" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [[ "$current_branch" == "master" ]] && ! git -C "$target_dir" rev-parse --verify HEAD >/dev/null 2>&1; then
+    git -C "$target_dir" branch -m master main || true
+  fi
+}
+
+replace_matching_files() {
+  local source_dir="$1"
+  local target_dir_path="$2"
+  local pattern="$3"
+
+  mkdir -p "$target_dir_path"
+  find "$target_dir_path" -maxdepth 1 -type f -name "$pattern" -delete
+  find "$source_dir" -maxdepth 1 -type f -name "$pattern" -exec cp {} "$target_dir_path/" \;
+}
+
+stage_speckit_bootstrap() {
+  local preset_dir="$1"
+  local workflow_path="$2"
+
+  bootstrap_temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/dev-env-speckit-init.XXXXXX")"
+
+  (
+    cd "$bootstrap_temp_dir"
+    run_speckit init --here --offline --ai copilot --script sh --force --branch-numbering sequential
+    if [[ -f "$preset_dir/preset.yml" ]]; then
+      run_speckit preset add --dev "$preset_dir" --priority 1
+    fi
+    if [[ -f "$workflow_path" ]]; then
+      run_speckit workflow add "$workflow_path"
+    fi
+  )
+}
+
+sync_staged_speckit_bootstrap() {
+  if [[ $force_speckit_init -eq 1 ]]; then
+    replace_tree "$bootstrap_temp_dir/.specify" "$target_dir/.specify"
+    if [[ -d "$bootstrap_temp_dir/.github/agents" ]]; then
+      replace_matching_files "$bootstrap_temp_dir/.github/agents" "$target_dir/.github/agents" 'speckit*.agent.md'
+    fi
+    if [[ -d "$bootstrap_temp_dir/.github/prompts" ]]; then
+      replace_matching_files "$bootstrap_temp_dir/.github/prompts" "$target_dir/.github/prompts" 'speckit*.prompt.md'
+    fi
+    return
+  fi
+
+  if [[ -d "$bootstrap_temp_dir/.specify" ]]; then
+    merge_missing_tree "$bootstrap_temp_dir/.specify" "$target_dir/.specify"
+  fi
+  if [[ -d "$bootstrap_temp_dir/.github/agents" ]]; then
+    merge_missing_tree "$bootstrap_temp_dir/.github/agents" "$target_dir/.github/agents"
+  fi
+  if [[ -d "$bootstrap_temp_dir/.github/prompts" ]]; then
+    merge_missing_tree "$bootstrap_temp_dir/.github/prompts" "$target_dir/.github/prompts"
+  fi
+}
 
 find_extracted_source_root() {
   local devcontainer_dir extracted_root
@@ -247,35 +360,16 @@ resolve_source_root() {
 bootstrap_speckit() {
   local preset_dir workflow_path
 
-  if has_speckit_templates; then
+  if has_speckit_templates && [[ $force_speckit_init -ne 1 ]]; then
     echo "Spec Kit already exists in $target_dir; skipping initialization."
-  elif [[ -d "$target_dir/.specify" && $force_speckit_init -ne 1 ]]; then
-    echo "Existing .specify detected in $target_dir, but core Speckit command files were not found." >&2
-    echo "Refusing to reinitialize automatically. Re-run with --force-speckit-init if you want to replace the existing Spec Kit state." >&2
-    exit 1
   else
-    (
-      cd "$target_dir"
-      run_speckit init --here --offline --ai copilot --script sh --force --branch-numbering sequential
-    )
+    preset_dir="$source_root/spec-kit/presets/orchestrator-workflow"
+    workflow_path="$source_root/spec-kit/workflows/orchestrator-design-first.yml"
+    stage_speckit_bootstrap "$preset_dir" "$workflow_path"
+    sync_staged_speckit_bootstrap
   fi
 
-  preset_dir="$source_root/spec-kit/presets/orchestrator-workflow"
-  workflow_path="$source_root/spec-kit/workflows/orchestrator-design-first.yml"
-
-  if [[ -f "$preset_dir/preset.yml" ]]; then
-    (
-      cd "$target_dir"
-      run_speckit preset add --dev "$preset_dir" --priority 1
-    )
-  fi
-
-  if [[ -f "$workflow_path" ]]; then
-    (
-      cd "$target_dir"
-      run_speckit workflow add "$workflow_path"
-    )
-  fi
+  ensure_git_main_branch_preference
 }
 
 source_root="$(resolve_source_root)"
@@ -288,18 +382,35 @@ if [[ -z "$speckit_version" ]]; then
   speckit_version="${DEV_ENV_SPECKIT_VERSION:-$default_speckit_version}"
 fi
 
-assets=(
-  .devcontainer
-  .github/prompts
-  .github/agents
-  .github/instructions
-)
+load_asset_manifest() {
+  local manifest_path="$1"
+  assets=()
+  if [[ -f "$manifest_path" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      line="${line%%#*}"
+      line="${line#"${line%%[![:space:]]*}"}"
+      line="${line%"${line##*[![:space:]]}"}"
+      [[ -z "$line" ]] && continue
+      assets+=("$line")
+    done < "$manifest_path"
+  else
+    assets=(
+      .devcontainer
+      .github/prompts
+      .github/agents
+      .github/instructions
+      .github/copilot-instructions.md
+    )
+  fi
+}
 
-# Validate source directories
+load_asset_manifest "$source_root/.dev-env-assets"
+
+# Validate source assets
 if [[ $speckit_only -ne 1 ]]; then
   for asset in "${assets[@]}"; do
-    if [[ ! -d "$source_root/$asset" ]]; then
-      echo "Missing required directory in source: $asset" >&2
+    if [[ ! -e "$source_root/$asset" ]]; then
+      echo "Missing required asset in source: $asset" >&2
       exit 1
     fi
   done
@@ -315,38 +426,41 @@ if [[ $dry_run -eq 1 ]]; then
   echo "Dry run - the following would be installed into $target_dir:"
   if [[ $speckit_only -ne 1 ]]; then
     for asset in "${assets[@]}"; do
-      if [[ -e "$target_dir/$asset" ]]; then
+      if [[ -e "$target_dir/$asset" && $force -eq 1 ]]; then
         echo "  replace $asset"
+      elif [[ -e "$target_dir/$asset" ]] && asset_merges_missing_by_default "$asset"; then
+        echo "  merge   $asset"
+      elif [[ -e "$target_dir/$asset" ]]; then
+        echo "  conflict $asset"
       else
         echo "  create  $asset"
       fi
     done
   fi
   if [[ $with_speckit -eq 1 ]]; then
-    if has_speckit_templates; then
+    if has_speckit_templates && [[ $force_speckit_init -ne 1 ]]; then
       echo "  skip    .specify bootstrap (already initialized)"
-    elif [[ -d "$target_dir/.specify" && $force_speckit_init -ne 1 ]]; then
-      echo "  skip    .specify bootstrap (existing .specify preserved; use --force-speckit-init to reinitialize)"
+    elif [[ $force_speckit_init -eq 1 ]]; then
+      echo "  replace .specify bootstrap files via specify init --force"
     else
-      echo "  create  .specify bootstrap files via specify init"
+      echo "  merge   missing .specify and Speckit .github files via specify init"
     fi
-    echo "  install preset: orchestrator-workflow -> .specify/presets/"
-    echo "  install workflow: orchestrator-design-first -> .specify/workflows/"
+    if [[ $force_speckit_init -eq 1 ]]; then
+      echo "  replace preset: orchestrator-workflow -> .specify/presets/"
+      echo "  replace workflow: orchestrator-design-first -> .specify/workflows/"
+    else
+      echo "  merge   preset: orchestrator-workflow -> .specify/presets/"
+      echo "  merge   workflow: orchestrator-design-first -> .specify/workflows/"
+    fi
   fi
   exit 0
-fi
-
-if [[ $with_speckit -eq 1 && -d "$target_dir/.specify" && $force_speckit_init -ne 1 ]] && ! has_speckit_templates; then
-  echo "Existing .specify detected in $target_dir, but core Speckit command files were not found." >&2
-  echo "Refusing to reinitialize automatically. Re-run with --force-speckit-init if you want to replace the existing Spec Kit state." >&2
-  exit 1
 fi
 
 if [[ $speckit_only -ne 1 ]]; then
   # Collect all conflicts before failing
   conflicts=()
   for asset in "${assets[@]}"; do
-    if [[ -e "$target_dir/$asset" && $force -ne 1 ]]; then
+    if [[ -e "$target_dir/$asset" && $force -ne 1 ]] && ! asset_merges_missing_by_default "$asset"; then
       conflicts+=("$target_dir/$asset")
     fi
   done
@@ -359,8 +473,22 @@ if [[ $speckit_only -ne 1 ]]; then
 
   # Copy assets to target
   for asset in "${assets[@]}"; do
+    if asset_merges_missing_by_default "$asset" && [[ $force -ne 1 ]]; then
+      if [[ -d "$source_root/$asset" ]]; then
+        if [[ -d "$target_dir/$asset" ]]; then
+          merge_missing_tree "$source_root/$asset" "$target_dir/$asset"
+        else
+          mkdir -p "$(dirname "$target_dir/$asset")"
+          cp -R "$source_root/$asset" "$target_dir/$asset"
+        fi
+      else
+        merge_missing_file "$source_root/$asset" "$target_dir/$asset"
+      fi
+      continue
+    fi
+
     if [[ -e "$target_dir/$asset" ]]; then
-      rm -rf "$target_dir/$asset"
+      rm -rf "${target_dir:?}/$asset"
     fi
 
     mkdir -p "$(dirname "$target_dir/$asset")"
@@ -370,6 +498,20 @@ fi
 
 if [[ $with_speckit -eq 1 ]]; then
   bootstrap_speckit
+fi
+
+# Write installed version stamp
+if [[ $speckit_only -ne 1 ]]; then
+  local_sha=""
+  if command -v git >/dev/null 2>&1 && git -C "$source_root" rev-parse --git-dir >/dev/null 2>&1; then
+    local_sha="$(git -C "$source_root" rev-parse --short HEAD 2>/dev/null || true)"
+  fi
+  {
+    printf 'ref=%s\n' "$ref"
+    printf 'repo=%s\n' "$repo"
+    printf 'sha=%s\n' "${local_sha:-unknown}"
+    printf 'date=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$target_dir/.dev-env-version"
 fi
 
 if [[ $speckit_only -eq 1 ]]; then

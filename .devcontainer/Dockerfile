@@ -15,7 +15,9 @@ RUN apt-get update \
         jq \
         less \
         pkg-config \
+        shellcheck \
         unzip \
+        yamllint \
     && rm -rf /var/lib/apt/lists/*
 
 FROM base AS python

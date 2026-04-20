@@ -1,5 +1,5 @@
 {
-  "name": "dev-env",
+  "name": "kite",
   "build": {
     "context": "..",
     "dockerfile": "Dockerfile",
@@ -18,24 +18,30 @@
     "PIP_DISABLE_PIP_VERSION_CHECK": "1",
     "PYTHONDONTWRITEBYTECODE": "1"
   },
-  "// forwardPorts": "Customize these for your project. These are common defaults.",
-  "forwardPorts": [3000, 4173, 5173, 8000, 8501],
   "portsAttributes": {
     "3000": {
-      "label": "Web App"
+      "label": "Web App",
+      "onAutoForward": "ignore"
     },
     "4173": {
-      "label": "Preview Server"
+      "label": "Preview Server",
+      "onAutoForward": "ignore"
     },
     "5173": {
-      "label": "Vite Dev Server"
+      "label": "Vite Dev Server",
+      "onAutoForward": "ignore"
     },
     "8000": {
-      "label": "Python App"
+      "label": "Python App",
+      "onAutoForward": "ignore"
     },
     "8501": {
-      "label": "Streamlit"
+      "label": "Streamlit",
+      "onAutoForward": "ignore"
     }
+  },
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "customizations": {
@@ -44,6 +50,7 @@
         "editor.formatOnSave": true,
         "files.eol": "\n",
         "python.terminal.activateEnvironment": true,
+        "remote.restoreForwardedPorts": false,
         "terminal.integrated.defaultProfile.linux": "bash"
       },
       "extensions": [

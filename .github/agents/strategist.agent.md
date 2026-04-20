@@ -205,7 +205,7 @@ When handing off to Marketer, include the current strategist note path if you al
 
 - **Marketer (subagent)**: Use when audience or problem validation is fuzzy. **Required** when you judge **no viable market** (or equivalent) — see **Mandatory Marketer handoff**; the Marketer validates or refutes with evidence before more investment.
 - **Designer (subagent)**: Use when the feature is UI-heavy and the UX flows, interaction model, visual direction, or design-system decisions are still unresolved. Designer defines the direction before specification; UI Builder implements it later.
-- **speckit.specify (subagent)**: Use when the idea is concrete enough to become a real feature, the user wants to move into specification, and the repo has Speckit installed. Pass a concise feature statement, target users, scope, constraints, and open assumptions. Ask for confirmation before invoking it because it creates canonical feature artifacts.
+- **speckit.specify (subagent)**: Use when the idea is concrete enough to become a real feature, the user wants to move into specification, and the repo has Speckit installed. Route through `speckit.constitution` first to lock project standards, then pass a concise feature statement, target users, scope, constraints, and open assumptions to `speckit.specify`. Ask for confirmation before invoking it because it creates canonical feature artifacts.
 - **When Marketer asks for validation:** Review the evidence pack critically, challenge weak inferences, check whether the wedge is actually supported, and return a short verdict: `confirmed`, `partially confirmed`, or `not confirmed`, with the top reasons.
 - **When edits are needed:** Marketer can recommend documentation changes, but only **Strategist** performs the edits.
 - **When logging is needed:** Marketer can recommend what should be preserved, but only **Strategist** writes the dated brief and dated findings files.
@@ -214,8 +214,8 @@ When handing off to Marketer, include the current strategist note path if you al
 
 - **Before Idea Validation (Marketer):** If the user has a *solution* but no clear *problem* or *audience*, **or** after **Mandatory Marketer handoff** (no market / no audience / no differentiation).
    > Use the full template under **Mandatory Marketer handoff** — not a one-line question — and invoke Marketer yourself after user confirmation.
-- **Before Specification (Designer):** If the feature is UI-heavy and the experience, flows, states, or visual direction are still unclear, invoke Designer before `speckit.specify`.
-- **To enter specification (speckit.specify):** When the idea is good enough to brief, the user wants a formal feature workflow, Speckit is installed, and UX direction is either already clear or has been resolved with Designer.
+- **Before Specification (Designer):** If the feature is UI-heavy and the experience, flows, states, or visual direction are still unclear, recommend that Designer (or `speckit.design`) runs **after** `speckit.specify` to create the design system based on the approved spec. The `speckit.design` command automates writing the canonical design direction to `.specify/memory/design-direction.md`.
+- **To enter specification (speckit.specify):** When the idea is good enough to brief, the user wants a formal feature workflow, Speckit is installed, and the Strategist has produced a clear brief. Route through `speckit.constitution` first to lock project standards, then hand off to `speckit.specify`.
 
 ### Review loop
 

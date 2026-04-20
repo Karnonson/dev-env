@@ -1,26 +1,37 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
+"""
+Comprehensive patch for .devcontainer/bin/kite (v2 - using regex for function replacement)
+"""
+import re
 
-set -euo pipefail
+KITE = "/home/karnon/Dev-FullStack/dev-env/.devcontainer/bin/kite"
 
-default_repo="Karnonson/dev-env"
-default_ref="main"
-default_speckit_version="0.7.0"
+with open(KITE, "r") as f:
+    content = f.read()
 
-repo="$default_repo"
-ref="$default_ref"
-source_dir=""
-target_dir="."
-speckit_version=""
-with_speckit=0
-force_speckit_init=0
-dry_run=0
-merge_mode=0
-status_json=0
-mode=""
-temp_dir=""
-source_root=""
+# Verify we're starting from a clean base
+assert 'merge_mode' not in content, "File already patched"
+assert content.count('run_test') == 0, "run_test already exists"
 
-load_asset_manifest() {
+# ============================================================
+# 1. Add merge_mode global variable
+# ============================================================
+content = content.replace(
+    "dry_run=0\nstatus_json=0",
+    "dry_run=0\nmerge_mode=0\nstatus_json=0"
+)
+
+# ============================================================
+# 2. Add load_asset_manifest + update default assets
+# ============================================================
+old_assets = '''assets=(
+  .devcontainer
+  .github/prompts
+  .github/agents
+  .github/instructions
+)'''
+
+new_assets = '''load_asset_manifest() {
   local manifest_file="$1"
   local -a result=()
   if [[ -f "$manifest_file" ]]; then
@@ -40,7 +51,7 @@ load_asset_manifest() {
       .github/copilot-instructions.md
     )
   fi
-  printf '%s\n' "${result[@]}"
+  printf '%s\\n' "${result[@]}"
 }
 
 assets=(
@@ -49,155 +60,84 @@ assets=(
   .github/agents
   .github/instructions
   .github/copilot-instructions.md
-)
+)'''
 
-cleanup() {
-  if [[ -n "$temp_dir" && -d "$temp_dir" ]]; then
-    rm -rf "$temp_dir"
+content = content.replace(old_assets, new_assets)
+
+# ============================================================
+# 3. Replace collect_asset_state (use regex to match the whole function)
+# ============================================================
+old_collect = re.search(
+    r'^collect_asset_state\(\) \{.*?^}',
+    content, re.DOTALL | re.MULTILINE
+).group(0)
+
+new_collect = '''collect_asset_state() {
+  local resolved_source="$1"
+  local asset
+
+  # Reload assets from manifest if available
+  local -a manifest_assets=()
+  while IFS= read -r line; do
+    manifest_assets+=("$line")
+  done < <(load_asset_manifest "$resolved_source/.dev-env-assets")
+  if [[ ${#manifest_assets[@]} -gt 0 ]]; then
+    assets=("${manifest_assets[@]}")
   fi
-}
 
-trap cleanup EXIT
+  ASSET_CURRENT=()
+  ASSET_MISSING=()
+  ASSET_OUTDATED=()
 
-general_help() {
-  cat <<EOF
-kite — container-native Speckit workflow CLI.
-Always work on a feature branch; merge to main only after kite verify feature passes.
+  for asset in "${assets[@]}"; do
+    if [[ ! -e "$target_dir/$asset" ]]; then
+      ASSET_MISSING+=("$asset")
+    elif asset_matches_source "$asset" "$resolved_source/$asset" "$target_dir/$asset"; then
+      ASSET_CURRENT+=("$asset")
+    else
+      ASSET_OUTDATED+=("$asset")
+    fi
+  done
+}'''
+content = content.replace(old_collect, new_collect)
 
-Usage:
-  kite <command> [options] [target-directory]
+# ============================================================
+# 4. Update asset_matches_source to handle files
+# ============================================================
+old_asset_match = re.search(
+    r'^asset_matches_source\(\) \{.*?^}',
+    content, re.DOTALL | re.MULTILINE
+).group(0)
 
-Workspace commands:
-  install speckit    Bootstrap the bundled Spec Kit preset and workflow into a repo
-  update workspace   Refresh .devcontainer and .github workspace assets in a repo
-  doctor             Verify container tooling, workspace assets, and Spec Kit readiness
-  status             Show whether workspace assets are current and whether Spec Kit is bootstrapped
+new_asset_match = '''asset_matches_source() {
+  local asset="$1"
+  local source_path="$2"
+  local target_path="$3"
 
-Project commands:
-  new <name>         Scaffold a new project with dev-env assets
-  test               Detect stack and run the appropriate test suite
-  audit              Run dependency audits and security checks
-  release            Bump version, tag, and prepare a release
-  verify feature     Pre-merge checklist for the current feature branch
+  # File-level asset: use diff -q (not -r)
+  if [[ -f "$source_path" ]]; then
+    diff -q "$source_path" "$target_path" >/dev/null 2>&1
+    return
+  fi
 
-Other:
-  completion         Emit bash completion script
-  help [command]     Show general or command-specific help
+  case "$asset" in
+    .github/agents)
+      diff -qr --exclude='speckit.*.agent.md' "$source_path" "$target_path" >/dev/null 2>&1
+      ;;
+    .github/prompts)
+      diff -qr --exclude='speckit.*.prompt.md' "$source_path" "$target_path" >/dev/null 2>&1
+      ;;
+    *)
+      diff -qr "$source_path" "$target_path" >/dev/null 2>&1
+      ;;
+  esac
+}'''
+content = content.replace(old_asset_match, new_asset_match)
 
-Common examples:
-  kite install speckit .
-  kite update workspace .
-  kite update workspace --merge .
-  kite new my-app --with-speckit
-  kite status .
-  kite doctor .
-  kite test .
-  kite audit .
-  kite release --bump minor --confirm .
-  kite verify feature .
-EOF
-}
-
-install_speckit_help() {
-  cat <<EOF
-Usage:
-  kite install speckit [options] [target-directory]
-
-Bootstrap the bundled Spec Kit preset and workflow into a target repo without reinstalling the workspace assets.
-
-Options:
-  --force-speckit-init  Reinitialize Spec Kit when .specify already exists
-  --speckit-version V   Pin the Spec Kit CLI version used for bootstrap
-  --repo OWNER/REPO     Download dev-env assets from a different GitHub repository
-  --ref REF             Download dev-env assets from a different Git ref
-  --source-dir PATH     Use a local dev-env checkout instead of downloading
-  -h, --help            Show this help text
-
-Examples:
-  kite install speckit .
-  kite install speckit --force-speckit-init .
-  kite install speckit --source-dir /workspaces/dev-env .
-EOF
-}
-
-update_workspace_help() {
-  cat <<EOF
-Usage:
-  kite update workspace [options] [target-directory]
-
-Refresh the copied .devcontainer and .github workspace assets in a target repo.
-
-Update modes:
-  Default behavior replaces workspace assets from source (destructive for local edits).
-  --merge              Only add missing files; do not overwrite existing assets
-
-Options:
-  --merge              Non-destructive: only fill in missing files, keep existing ones
-  --dry-run            Preview what would change without writing
-  --with-speckit       Refresh workspace assets and bootstrap the bundled Spec Kit setup
-  --force-speckit-init Reinitialize Spec Kit when .specify already exists
-  --speckit-version V  Pin the Spec Kit CLI version used for bootstrap
-  --repo OWNER/REPO    Download dev-env assets from a different GitHub repository
-  --ref REF            Download dev-env assets from a different Git ref
-  --source-dir PATH    Use a local dev-env checkout instead of downloading
-  -h, --help           Show this help text
-
-Examples:
-  kite update workspace .
-  kite update workspace --merge .
-  kite update workspace --dry-run .
-  kite update workspace --with-speckit .
-EOF
-}
-
-doctor_help() {
-  cat <<EOF
-Usage:
-  kite doctor [options] [target-directory]
-
-Verify whether the target repo is ready for the container-native dev-env workflow.
-
-Checks:
-  - uv availability
-  - uvx or specify availability
-  - required workspace asset folders
-  - whether workspace assets match the selected source
-  - whether the bundled Spec Kit preset and workflow are installed
-
-Options:
-  --speckit-version V  Include a pinned Spec Kit version in suggested fix commands
-  --repo OWNER/REPO    Compare against a different GitHub repository
-  --ref REF            Compare against a different Git ref
-  --source-dir PATH    Compare against a local dev-env checkout instead of downloading
-  -h, --help           Show this help text
-
-Examples:
-  kite doctor .
-  kite doctor --source-dir /workspaces/dev-env .
-EOF
-}
-
-status_help() {
-  cat <<EOF
-Usage:
-  kite status [options] [target-directory]
-
-Show whether the workspace assets are current and whether the bundled Spec Kit setup is bootstrapped.
-
-Options:
-  --json               Emit machine-readable JSON output
-  --repo OWNER/REPO    Compare against a different GitHub repository
-  --ref REF            Compare against a different Git ref
-  --source-dir PATH    Compare against a local dev-env checkout instead of downloading
-  -h, --help           Show this help text
-
-Examples:
-  kite status .
-  kite status --json .
-  kite status --source-dir /workspaces/dev-env .
-EOF
-}
-
+# ============================================================
+# 5. Add new help functions before show_help
+# ============================================================
+new_help_functions = '''
 test_help() {
   cat <<EOF
 Usage:
@@ -311,8 +251,22 @@ Examples:
 EOF
 }
 
+'''
 
-show_help() {
+content = content.replace(
+    '\nshow_help() {\n',
+    new_help_functions + '\nshow_help() {\n'
+)
+
+# ============================================================
+# 6. Update show_help dispatch
+# ============================================================
+old_show_help = re.search(
+    r'^show_help\(\) \{.*?^}',
+    content, re.DOTALL | re.MULTILINE
+).group(0)
+
+new_show_help = '''show_help() {
   case "$1" in
     "install-speckit")
       install_speckit_help
@@ -345,227 +299,100 @@ show_help() {
       general_help
       ;;
   esac
-}
+}'''
+content = content.replace(old_show_help, new_show_help)
 
-require_command() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "Missing required command: $1" >&2
-    exit 1
-  fi
-}
+# ============================================================
+# 7. Update general_help
+# ============================================================
+old_general_help = re.search(
+    r'^general_help\(\) \{.*?^}',
+    content, re.DOTALL | re.MULTILINE
+).group(0)
 
-shell_join() {
-  local arg quoted output=""
+new_general_help = r'''general_help() {
+  cat <<EOF
+kite — container-native Speckit workflow CLI.
+Always work on a feature branch; merge to main only after kite verify feature passes.
 
-  for arg in "$@"; do
-    printf -v quoted '%q' "$arg"
-    if [[ -n "$output" ]]; then
-      output+=" "
-    fi
-    output+="$quoted"
-  done
+Usage:
+  kite <command> [options] [target-directory]
 
-  printf '%s\n' "$output"
-}
+Workspace commands:
+  install speckit    Bootstrap the bundled Spec Kit preset and workflow into a repo
+  update workspace   Refresh .devcontainer and .github workspace assets in a repo
+  doctor             Verify container tooling, workspace assets, and Spec Kit readiness
+  status             Show whether workspace assets are current and whether Spec Kit is bootstrapped
 
-json_escape() {
-  local value="$1"
+Project commands:
+  new <name>         Scaffold a new project with dev-env assets
+  test               Detect stack and run the appropriate test suite
+  audit              Run dependency audits and security checks
+  release            Bump version, tag, and prepare a release
+  verify feature     Pre-merge checklist for the current feature branch
 
-  value=${value//\\/\\\\}
-  value=${value//\"/\\\"}
-  value=${value//$'\n'/\\n}
-  value=${value//$'\r'/\\r}
-  value=${value//$'\t'/\\t}
+Other:
+  completion         Emit bash completion script
+  help [command]     Show general or command-specific help
 
-  printf '"%s"' "$value"
-}
+Common examples:
+  kite install speckit .
+  kite update workspace .
+  kite update workspace --merge .
+  kite new my-app --with-speckit
+  kite test .
+  kite audit .
+  kite release --bump minor --confirm .
+  kite verify feature .
+  kite doctor .
+  kite status .
+EOF
+}'''
+content = content.replace(old_general_help, new_general_help)
 
-json_array() {
-  local first=1 item
+# ============================================================
+# 8. Update update_workspace_help
+# ============================================================
+old_update_help = re.search(
+    r'^update_workspace_help\(\) \{.*?^}',
+    content, re.DOTALL | re.MULTILINE
+).group(0)
 
-  printf '['
-  for item in "$@"; do
-    if [[ $first -eq 0 ]]; then
-      printf ','
-    fi
-    json_escape "$item"
-    first=0
-  done
-  printf ']'
-}
+new_update_help = r'''update_workspace_help() {
+  cat <<EOF
+Usage:
+  kite update workspace [options] [target-directory]
 
-find_extracted_source_root() {
-  local devcontainer_dir extracted_root
+Refresh the copied .devcontainer and .github workspace assets in a target repo.
 
-  devcontainer_dir="$(find "$temp_dir" -mindepth 2 -maxdepth 4 -type d -name .devcontainer | head -n 1 || true)"
-  if [[ -n "$devcontainer_dir" ]]; then
-    dirname "$devcontainer_dir"
-    return
-  fi
+Update modes:
+  Default behavior replaces workspace assets from source (destructive for local edits).
+  --merge              Only add missing files; do not overwrite existing assets
 
-  extracted_root="$(find "$temp_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1 || true)"
-  if [[ -z "$extracted_root" ]]; then
-    echo "Failed to locate source root in downloaded archive." >&2
-    exit 1
-  fi
+Options:
+  --merge              Non-destructive: only fill in missing files, keep existing ones
+  --dry-run            Preview what would change without writing
+  --with-speckit       Refresh workspace assets and bootstrap the bundled Spec Kit setup
+  --force-speckit-init Reinitialize Spec Kit when .specify already exists
+  --speckit-version V  Pin the Spec Kit CLI version used for bootstrap
+  --repo OWNER/REPO    Download dev-env assets from a different GitHub repository
+  --ref REF            Download dev-env assets from a different Git ref
+  --source-dir PATH    Use a local dev-env checkout instead of downloading
+  -h, --help           Show this help text
 
-  printf '%s\n' "$extracted_root"
-}
+Examples:
+  kite update workspace .
+  kite update workspace --merge .
+  kite update workspace --dry-run .
+  kite update workspace --with-speckit .
+EOF
+}'''
+content = content.replace(old_update_help, new_update_help)
 
-resolve_source_root() {
-  if [[ -n "$source_root" ]]; then
-    printf '%s\n' "$source_root"
-    return
-  fi
-
-  if [[ -n "$source_dir" ]]; then
-    source_root="$(cd "$source_dir" 2>/dev/null && pwd || true)"
-    if [[ -z "$source_root" || ! -d "$source_root" ]]; then
-      echo "Source directory does not exist: $source_dir" >&2
-      exit 1
-    fi
-
-    printf '%s\n' "$source_root"
-    return
-  fi
-
-  require_command curl
-  require_command tar
-  require_command mktemp
-
-  temp_dir="$(mktemp -d)"
-  local archive_path="$temp_dir/dev-env.tar.gz"
-  local archive_url="https://github.com/${repo}/archive/${ref}.tar.gz"
-
-  curl -fsSL "$archive_url" -o "$archive_path"
-  tar -xzf "$archive_path" -C "$temp_dir"
-  source_root="$(find_extracted_source_root)"
-  printf '%s\n' "$source_root"
-}
-
-has_speckit_bootstrap() {
-  local target="$1"
-  local required_file
-  local required_files=(
-    .specify/presets/orchestrator-workflow/preset.yml
-    .specify/presets/orchestrator-workflow/commands/speckit.constitution.md
-    .specify/presets/orchestrator-workflow/commands/speckit.design.md
-    .specify/presets/orchestrator-workflow/commands/speckit.implement.md
-    .specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md
-    .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
-    .specify/presets/orchestrator-workflow/commands/speckit.test.md
-    .specify/workflows/orchestrator-design-first/workflow.yml
-    .github/agents/speckit.constitution.agent.md
-    .github/agents/speckit.design.agent.md
-    .github/agents/speckit.implement.agent.md
-  )
-
-  for required_file in "${required_files[@]}"; do
-    if [[ ! -f "$target/$required_file" ]]; then
-      return 1
-    fi
-  done
-
-  return 0
-}
-
-asset_matches_source() {
-  local asset="$1"
-  local source_path="$2"
-  local target_path="$3"
-
-  # File-level asset: use diff -q (not -r)
-  if [[ -f "$source_path" ]]; then
-    diff -q "$source_path" "$target_path" >/dev/null 2>&1
-    return
-  fi
-
-  case "$asset" in
-    .github/agents)
-      diff -qr --exclude='speckit.*.agent.md' "$source_path" "$target_path" >/dev/null 2>&1
-      ;;
-    .github/prompts)
-      diff -qr --exclude='speckit.*.prompt.md' "$source_path" "$target_path" >/dev/null 2>&1
-      ;;
-    *)
-      diff -qr "$source_path" "$target_path" >/dev/null 2>&1
-      ;;
-  esac
-}
-
-collect_asset_state() {
-  local resolved_source="$1"
-  local asset
-
-  # Reload assets from manifest if available
-  local -a manifest_assets=()
-  while IFS= read -r line; do
-    manifest_assets+=("$line")
-  done < <(load_asset_manifest "$resolved_source/.dev-env-assets")
-  if [[ ${#manifest_assets[@]} -gt 0 ]]; then
-    assets=("${manifest_assets[@]}")
-  fi
-
-  ASSET_CURRENT=()
-  ASSET_MISSING=()
-  ASSET_OUTDATED=()
-
-  for asset in "${assets[@]}"; do
-    if [[ ! -e "$target_dir/$asset" ]]; then
-      ASSET_MISSING+=("$asset")
-    elif asset_matches_source "$asset" "$resolved_source/$asset" "$target_dir/$asset"; then
-      ASSET_CURRENT+=("$asset")
-    else
-      ASSET_OUTDATED+=("$asset")
-    fi
-  done
-}
-
-target_arg() {
-  if [[ "$target_dir" == "$PWD" ]]; then
-    printf '.\n'
-    return
-  fi
-
-  printf '%s\n' "$target_dir"
-}
-
-build_kite_command() {
-  local -a cmd=(kite)
-  local target
-
-  cmd+=("$@")
-
-  if [[ -n "$speckit_version" ]]; then
-    cmd+=(--speckit-version "$speckit_version")
-  fi
-
-  if [[ -n "$source_dir" ]]; then
-    cmd+=(--source-dir "$source_dir")
-  else
-    if [[ "$repo" != "$default_repo" ]]; then
-      cmd+=(--repo "$repo")
-    fi
-    if [[ "$ref" != "$default_ref" ]]; then
-      cmd+=(--ref "$ref")
-    fi
-  fi
-
-  target="$(target_arg)"
-  cmd+=("$target")
-  shell_join "${cmd[@]}"
-}
-
-build_post_create_command() {
-  local script_path="$target_dir/.devcontainer/post-create.sh"
-
-  if [[ "$target_dir" == "$PWD" ]]; then
-    script_path=".devcontainer/post-create.sh"
-  fi
-
-  shell_join bash "$script_path"
-}
-
+# ============================================================
+# 9. Add all new functions before run_install_action
+# ============================================================
+new_functions = r'''
 default_branch_name() {
   local target="${1:-.}"
   local branch
@@ -878,7 +705,7 @@ run_verify_feature() {
     echo "[warn] Currently on $default_branch; switch to a feature branch first"
     issues=1
   else
-    echo "[ok] active feature branch: $current_branch"
+    echo "[ok] activetive feature branch: $current_branch"
   fi
 
   if [[ -n "$(git -C "$target_dir" status --porcelain)" ]]; then
@@ -918,6 +745,7 @@ run_verify_feature() {
       echo "[ok] tracked tasks are complete in $rel_tasks"
     fi
   else
+    echo "[info] no active Speckit tasks file
     echo "[info] no active Speckit tasks file was identified for this branch"
   fi
 
@@ -946,22 +774,6 @@ run_new() {
       --with-speckit)
         new_with_speckit=1
         shift
-        ;;
-      --speckit-version)
-        speckit_version="${2:?Missing value for --speckit-version}"
-        shift 2
-        ;;
-      --repo)
-        repo="${2:?Missing value for --repo}"
-        shift 2
-        ;;
-      --ref)
-        ref="${2:?Missing value for --ref}"
-        shift 2
-        ;;
-      --source-dir)
-        source_dir="${2:?Missing value for --source-dir}"
-        shift 2
         ;;
       --git-init-commit)
         git_init_commit=1
@@ -1307,63 +1119,30 @@ run_completion() {
   esac
 }
 
+'''
 
-run_install_action() {
-  local -a installer_args=(--with-speckit --speckit-only)
+content = content.replace(
+    '\nrun_install_action() {\n',
+    new_functions + '\nrun_install_action() {\n'
+)
 
-  if [[ $force_speckit_init -eq 1 ]]; then
-    installer_args+=(--force-speckit-init)
-  fi
+# ============================================================
+# 10. Update run_update_action with --merge
+# ============================================================
+content = content.replace(
+    'run_update_action() {\n  local -a installer_args=(--force)',
+    'run_update_action() {\n  local -a installer_args=()\n\n  if [[ $merge_mode -ne 1 ]]; then\n    installer_args+=(--force)\n  fi'
+)
 
-  if [[ -n "$speckit_version" ]]; then
-    installer_args+=(--speckit-version "$speckit_version")
-  fi
+# ============================================================
+# 11. Replace run_status entirely with version stamp support
+# ============================================================
+old_run_status = re.search(
+    r'^run_status\(\) \{.*?^}',
+    content, re.DOTALL | re.MULTILINE
+).group(0)
 
-  installer_args+=(--repo "$repo" --ref "$ref" "$target_dir")
-
-  if [[ -n "$source_dir" ]]; then
-    installer_args=("${installer_args[@]:0:${#installer_args[@]}-3}" --source-dir "$source_dir" "$target_dir")
-    bash "$source_dir/install.sh" "${installer_args[@]}"
-    return
-  fi
-
-  require_command curl
-  curl -fsSL "https://raw.githubusercontent.com/${repo}/${ref}/install.sh" | bash -s -- "${installer_args[@]}"
-}
-
-run_update_action() {
-  local -a installer_args=()
-
-  if [[ $merge_mode -ne 1 ]]; then
-    installer_args+=(--force)
-  fi
-
-  if [[ $dry_run -eq 1 ]]; then
-    installer_args+=(--dry-run)
-  fi
-  if [[ $with_speckit -eq 1 ]]; then
-    installer_args+=(--with-speckit)
-  fi
-  if [[ $force_speckit_init -eq 1 ]]; then
-    installer_args+=(--force-speckit-init)
-  fi
-  if [[ -n "$speckit_version" ]]; then
-    installer_args+=(--speckit-version "$speckit_version")
-  fi
-
-  installer_args+=(--repo "$repo" --ref "$ref" "$target_dir")
-
-  if [[ -n "$source_dir" ]]; then
-    installer_args=("${installer_args[@]:0:${#installer_args[@]}-3}" --source-dir "$source_dir" "$target_dir")
-    bash "$source_dir/install.sh" "${installer_args[@]}"
-    return
-  fi
-
-  require_command curl
-  curl -fsSL "https://raw.githubusercontent.com/${repo}/${ref}/install.sh" | bash -s -- "${installer_args[@]}"
-}
-
-run_status() {
+new_run_status = r'''run_status() {
   local resolved_source speckit_state asset workspace_status speckit_status preset_state workflow_state source_label
 
   resolved_source="$(resolve_source_root)"
@@ -1491,141 +1270,55 @@ run_status() {
   echo ""
   echo "Workspace status: ${workspace_status//-/ }"
   echo "Speckit status: ${speckit_status//-/ }"
-}
+}'''
+content = content.replace(old_run_status, new_run_status)
 
-run_doctor() {
-  local resolved_source issues=0 speckit_fix
+# ============================================================
+# 12. Update run_doctor with version stamp check
+# ============================================================
+content = content.replace(
+    '  if has_speckit_bootstrap "$target_dir"; then\n    echo "[ok] bundled Spec Kit preset, commands, workflow, and agents are installed"',
+    '  if [[ -f "$target_dir/.dev-env-version" ]]; then\n    echo "[ok] dev-env version stamp present"\n  else\n    echo "[info] no .dev-env-version stamp (run kite update workspace to add one)"\n  fi\n\n  if has_speckit_bootstrap "$target_dir"; then\n    echo "[ok] bundled Spec Kit preset, commands, workflow, and agents are installed"'
+)
 
-  resolved_source="$(resolve_source_root)"
-  collect_asset_state "$resolved_source"
-
-  echo "Doctor target: $target_dir"
-
-  if command -v uv >/dev/null 2>&1; then
-    echo "[ok] uv is available"
-  else
-    echo "[warn] uv is missing"
-    echo "       Fix: $(build_post_create_command)"
-    issues=1
-  fi
-
-  if command -v uvx >/dev/null 2>&1 || command -v specify >/dev/null 2>&1; then
-    echo "[ok] Spec Kit runtime is available (uvx or specify)"
-  else
-    echo "[warn] neither uvx nor specify is available"
-    echo "       Fix: $(build_post_create_command)"
-    issues=1
-  fi
-
-  if (( ${#ASSET_MISSING[@]} == 0 && ${#ASSET_OUTDATED[@]} == 0 )); then
-    echo "[ok] workspace assets are current"
-  else
-    if (( ${#ASSET_MISSING[@]} > 0 )); then
-      echo "[warn] workspace assets are missing: ${ASSET_MISSING[*]}"
-    fi
-    if (( ${#ASSET_OUTDATED[@]} > 0 )); then
-      echo "[warn] workspace assets are outdated: ${ASSET_OUTDATED[*]}"
-    fi
-    echo "       Fix: $(build_kite_command update workspace)"
-    issues=1
-  fi
-
-  if [[ -f "$target_dir/.dev-env-version" ]]; then
-    echo "[ok] dev-env version stamp present"
-  else
-    echo "[info] no .dev-env-version stamp (run kite update workspace to add one)"
-  fi
-
-  if has_speckit_bootstrap "$target_dir"; then
-    echo "[ok] bundled Spec Kit preset, commands, workflow, and agents are installed"
-  elif [[ -d "$target_dir/.specify" ]]; then
-    speckit_fix="$(build_kite_command install speckit --force-speckit-init)"
-    echo "[warn] .specify exists, but the bundled Spec Kit preset/workflow is incomplete"
-    echo "       Fix: $speckit_fix"
-    issues=1
-  else
-    speckit_fix="$(build_kite_command install speckit)"
-    echo "[warn] bundled Spec Kit is not bootstrapped"
-    echo "       Fix: $speckit_fix"
-    issues=1
-  fi
-
-  if [[ $issues -eq 0 ]]; then
-    echo "Doctor status: ready"
-    return 0
-  fi
-
-  echo "Doctor status: action needed"
-  return 1
-}
-
-normalize_target_dir() {
-  target_dir="$(cd "$target_dir" 2>/dev/null && pwd || true)"
-
-  if [[ -z "$target_dir" || ! -d "$target_dir" ]]; then
-    echo "Target directory does not exist." >&2
-    exit 1
-  fi
-}
-
-parse_help_target() {
-  local first="${1:-}"
-  local second="${2:-}"
-
-  case "$first $second" in
-    "install speckit")
-      show_help "install-speckit"
+# ============================================================
+# 13. Update main() dispatch
+# ============================================================
+old_dispatch = '''  case "$primary_command" in
+    install)
+      if [[ "$secondary_command" != "speckit" ]]; then
+        echo "Unknown command: ${primary_command} ${secondary_command}" >&2
+        show_help "general" >&2
+        exit 1
+      fi
+      mode="install-speckit"
+      shift 2
       ;;
-    "update workspace")
-      show_help "update-workspace"
+    update)
+      if [[ "$secondary_command" != "workspace" ]]; then
+        echo "Unknown command: ${primary_command} ${secondary_command}" >&2
+        show_help "general" >&2
+        exit 1
+      fi
+      mode="update-workspace"
+      shift 2
       ;;
-    "doctor "|"doctor")
-      show_help "doctor"
+    doctor)
+      mode="doctor"
+      shift 1
       ;;
-    "status "|"status")
-      show_help "status"
-      ;;
-    "test "|"test")
-      show_help "test"
-      ;;
-    "audit "|"audit")
-      show_help "audit"
-      ;;
-    "new "|"new")
-      show_help "new"
-      ;;
-    "release "|"release")
-      show_help "release"
-      ;;
-    "verify feature")
-      show_help "verify-feature"
+    status)
+      mode="status"
+      shift 1
       ;;
     *)
-      show_help "general"
+      echo "Unknown command: ${primary_command} ${secondary_command}" >&2
+      show_help "general" >&2
+      exit 1
       ;;
-  esac
-}
+  esac'''
 
-main() {
-  local primary_command="${1:-}"
-  local secondary_command="${2:-}"
-
-  if [[ -z "$primary_command" || "$primary_command" == "-h" || "$primary_command" == "--help" ]]; then
-    show_help "general"
-    exit 0
-  fi
-
-  if [[ "$primary_command" == "help" ]]; then
-    parse_help_target "$secondary_command" "${3:-}"
-    exit 0
-  fi
-
-  if [[ "$primary_command" == "speckit" && "$secondary_command" == "install" ]]; then
-    primary_command="install"
-    secondary_command="speckit"
-  fi
-
-  case "$primary_command" in
+new_dispatch = '''  case "$primary_command" in
     install)
       if [[ "$secondary_command" != "speckit" ]]; then
         echo "Unknown command: ${primary_command} ${secondary_command}" >&2
@@ -1678,15 +1371,19 @@ main() {
       show_help "general" >&2
       exit 1
       ;;
-  esac
+  esac'''
+content = content.replace(old_dispatch, new_dispatch)
 
-  if [[ "$mode" == "new" ]]; then
-    run_new "$@"
-    exit $?
-  fi
-
-  # Commands that handle their own argument parsing
-  if [[ "$mode" == "test" || "$mode" == "audit" || "$mode" == "release" || "$mode" == "verify-feature" ]]; then
+# ============================================================
+# 14. Add passthrough handling for new commands
+# ============================================================
+content = content.replace(
+    '''  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run)
+        if [[ "$mode" != "update-workspace" ]]; then''',
+    '''  # Commands that handle their own argument parsing
+  if [[ "$mode" == "test" || "$mode" == "audit" || "$mode" == "release" || "$mode" == "new" || "$mode" == "verify-feature" ]]; then
     local -a passthrough_args=()
     local arg
     for arg in "$@"; do
@@ -1702,6 +1399,7 @@ main() {
       test)    run_test "${passthrough_args[@]+"${passthrough_args[@]}"}" ;;
       audit)   run_audit "${passthrough_args[@]+"${passthrough_args[@]}"}" ;;
       release) run_release "${passthrough_args[@]+"${passthrough_args[@]}"}" ;;
+      new)     run_new "${passthrough_args[@]+"${passthrough_args[@]}"}" ;;
       verify-feature) run_verify_feature ;;
     esac
     exit $?
@@ -1716,6 +1414,24 @@ main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --dry-run)
+        if [[ "$mode" != "update-workspace" ]]; then'''
+)
+
+# ============================================================
+# 15. Add --merge option parsing
+# ============================================================
+content = content.replace(
+    '''      --dry-run)
+        if [[ "$mode" != "update-workspace" ]]; then
+          echo "Unknown option: $1" >&2
+          show_help "$mode" >&2
+          exit 1
+        fi
+        dry_run=1
+        shift
+        ;;
+      --with-speckit)''',
+    '''      --dry-run)
         if [[ "$mode" != "update-workspace" ]]; then
           echo "Unknown option: $1" >&2
           show_help "$mode" >&2
@@ -1733,91 +1449,51 @@ main() {
         merge_mode=1
         shift
         ;;
-      --with-speckit)
-        if [[ "$mode" != "update-workspace" ]]; then
-          echo "Unknown option: $1" >&2
-          show_help "$mode" >&2
-          exit 1
-        fi
-        with_speckit=1
-        shift
-        ;;
-      --json)
-        if [[ "$mode" != "status" ]]; then
-          echo "Unknown option: $1" >&2
-          show_help "$mode" >&2
-          exit 1
-        fi
-        status_json=1
-        shift
-        ;;
-      --force-speckit-init)
-        if [[ "$mode" != "install-speckit" && "$mode" != "update-workspace" ]]; then
-          echo "Unknown option: $1" >&2
-          show_help "$mode" >&2
-          exit 1
-        fi
-        force_speckit_init=1
-        shift
-        ;;
-      --speckit-version)
-        speckit_version="${2:?Missing value for --speckit-version}"
-        shift 2
-        ;;
-      --repo)
-        repo="${2:?Missing value for --repo}"
-        shift 2
-        ;;
-      --ref)
-        ref="${2:?Missing value for --ref}"
-        shift 2
-        ;;
-      --source-dir)
-        source_dir="${2:?Missing value for --source-dir}"
-        shift 2
-        ;;
-      -h|--help)
-        show_help "$mode"
-        exit 0
-        ;;
-      --)
-        shift
-        break
-        ;;
-      -* )
-        echo "Unknown option: $1" >&2
-        show_help "$mode" >&2
-        exit 1
-        ;;
-      *)
-        target_dir="$1"
-        shift
-        ;;
-    esac
-  done
+      --with-speckit)'''
+)
 
-  if [[ $# -gt 0 ]]; then
-    echo "Unexpected arguments: $*" >&2
-    show_help "$mode" >&2
-    exit 1
-  fi
+# ============================================================
+# 16. Update help targets
+# ============================================================
+content = content.replace(
+    '''    "doctor "|"doctor")
+      show_help "doctor"
+      ;;
+    "status "|"status")
+      show_help "status"
+      ;;
+    *)
+      show_help "general"
+      ;;
+  esac''',
+    '''    "doctor "|"doctor")
+      show_help "doctor"
+      ;;
+    "status "|"status")
+      show_help "status"
+      ;;
+    "test "|"test")
+      show_help "test"
+      ;;
+    "audit "|"audit")
+      show_help "audit"
+      ;;
+    "new "|"new")
+      show_help "new"
+      ;;
+    "release "|"release")
+      show_help "release"
+      ;;
+    "verify feature")
+      show_help "verify-feature"
+      ;;
+    *)
+      show_help "general"
+      ;;
+  esac'''
+)
 
-  normalize_target_dir
+with open(KITE, "w") as f:
+    f.write(content)
 
-  case "$mode" in
-    install-speckit)
-      run_install_action
-      ;;
-    update-workspace)
-      run_update_action
-      ;;
-    doctor)
-      run_doctor
-      ;;
-    status)
-      run_status
-      ;;
-  esac
-}
-
-main "$@"
+print(f"Patch complete. File is now {len(content.splitlines())} lines.")

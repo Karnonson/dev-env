@@ -16,8 +16,10 @@ Diagnose workflow drift and readiness for this operating model:
 
 - Speckit owns canonical feature artifacts.
 - `Orchestrator` is the global workflow coordinator.
+- `Strategist` clarifies the idea before the Speckit pipeline begins.
+- `Designer` runs after `speckit.specify` to create design direction and brand identity.
 - `Backend Dev` and `UI Builder` are the primary implementation agents.
-- `Designer` is optional and used before `speckit.specify` when design direction or UX decisions are unresolved.
+- `DevOps` handles CI/CD, deployment, and infrastructure concerns.
 
 ## What To Check
 
@@ -45,7 +47,7 @@ Diagnose workflow drift and readiness for this operating model:
 4. Implementation readiness
 
 - Can a feature move cleanly through this path?
-  `Strategist` -> optional `Marketer` -> optional `Designer` -> `speckit.specify` -> `speckit.plan` -> `speckit.tasks` -> `speckit.analyze` -> `Backend Dev` / `UI Builder` -> `Code Reviewer` -> tests
+  `Strategist` -> `speckit.constitution` -> `speckit.specify` -> `Designer` -> `speckit.plan` -> `speckit.tasks` -> `speckit.analyze` -> `Backend Dev` / `UI Builder` -> `speckit.test` -> `Code Reviewer` -> `kite verify feature`
 - Identify any missing step, missing file, or contradictory rule that breaks this path.
 
 ## Execution Rules
@@ -73,10 +75,13 @@ Return these sections:
 
 - State whether the repo matches this target model:
   - `Orchestrator` coordinates
+  - `Strategist` clarifies ideas first and routes through constitution
+  - `Designer` runs after `speckit.specify` and writes to `.specify/memory/design-direction.md`
   - `Backend Dev` and `UI Builder` implement
-  - `Designer` is optional and upstream of `speckit.specify` when design decisions are unresolved
+  - `DevOps` manages CI/CD and deployment
+  - `speckit.test` runs after implementation as a test gate
   - `speckit.analyze` runs before implementation as the artifact consistency gate
-  - `Code Reviewer` runs after implementation before final verification
+  - `Code Reviewer` runs after testing before final verification
 
 ### Recommended Fixes
 

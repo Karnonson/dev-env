@@ -99,6 +99,7 @@ This repo-local alignment should make the repo behave like this:
 - `Backend Dev` and `UI Builder` are the primary implementation agents.
 - `Designer` is an optional pre-specification design stage for visual direction, UX decisions, or design-system work on UI-heavy features.
 - Run `speckit.analyze` after `speckit.tasks` and before implementation.
+- Implementation happens on feature branches, not `main`, and merge to `main` only after review and verification pass.
 - After implementation, prefer `Code Reviewer` before final verification or merge.
 - The primary orchestrator is my user-level `Orchestrator` agent.
 - Supporting notes belong under `team/agents/<agent>/YYYY-MM-DD-[feature-name].md` and must not duplicate canonical Speckit artifacts.
@@ -128,6 +129,7 @@ If `.github/copilot-instructions.md` does not exist, create it with this baselin
 - If a durable idea brief or handoff is useful before specification, store it under `team/agents/<agent-name>/YYYY-MM-DD-<feature-name>.md`.
 - Once a feature direction is approved, hand off a concise feature statement to `speckit.specify`.
 - Let Speckit own specification, clarification, planning, tasks, and consistency analysis.
+- Do implementation work on the active feature branch and keep `main` as the merge target only after verification and review are complete.
 - After `speckit.tasks`, implementation agents must execute from the active `tasks.md` and reference relevant FR IDs, user stories, or task IDs from the matching Speckit artifact set.
 - After `speckit.tasks`, prefer `speckit.analyze` before implementation.
 - After implementation, prefer `Code Reviewer` before final verification or merge.

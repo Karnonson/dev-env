@@ -15,6 +15,8 @@ fi
 
 if [[ -f "$script_dir/bin/kite" ]]; then
   sudo install -m 0755 "$script_dir/bin/kite" /usr/local/bin/kite
+  sudo mkdir -p /etc/bash_completion.d
+  bash "$script_dir/bin/kite" completion bash | sudo tee /etc/bash_completion.d/kite >/dev/null
   sudo rm -f /usr/local/bin/dev-env
 fi
 

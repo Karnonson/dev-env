@@ -2,10 +2,10 @@ schema_version: "1.0"
 
 workflow:
   id: "orchestrator-design-first"
-  name: "Design-First SDD Cycle"
-  version: "1.0.0"
+  name: "Strategist-Led SDD Cycle"
+  version: "2.0.0"
   author: "Karnon"
-  description: "Runs constitution -> design -> specify -> plan -> tasks -> analyze -> backend -> UI with explicit review gates."
+  description: "Strategist -> constitution -> specify -> design -> plan -> tasks -> analyze -> backend -> UI -> test -> review on a feature branch with explicit gates."
 
 requires:
   speckit_version: ">=0.6.1"
@@ -23,6 +23,12 @@ inputs:
     prompt: "Integration to use (e.g. copilot, claude, gemini)"
 
 steps:
+  - id: strategist-preamble
+    type: gate
+    message: "Before running this pipeline, the Strategist should have already explored and approved the feature idea interactively. Confirm the idea is ready for the formal SDD cycle."
+    options: [approve, abort]
+    on_reject: abort
+
   - id: constitution
     command: speckit.constitution
     integration: "{{ inputs.integration }}"
@@ -31,19 +37,7 @@ steps:
 
   - id: review-constitution
     type: gate
-    message: "Review the project principles before the design pass starts."
-    options: [approve, reject]
-    on_reject: abort
-
-  - id: design
-    command: speckit.design
-    integration: "{{ inputs.integration }}"
-    input:
-      args: "{{ inputs.feature_name }}"
-
-  - id: review-design
-    type: gate
-    message: "Review the design direction before specification."
+    message: "Review the project principles before specification starts. The Strategist should have already clarified the feature idea before this point."
     options: [approve, reject]
     on_reject: abort
 
@@ -55,7 +49,19 @@ steps:
 
   - id: review-spec
     type: gate
-    message: "Review the generated spec before planning."
+    message: "Review the generated spec before the design pass."
+    options: [approve, reject]
+    on_reject: abort
+
+  - id: design
+    command: speckit.design
+    integration: "{{ inputs.integration }}"
+    input:
+      args: "{{ inputs.feature_name }}"
+
+  - id: review-design
+    type: gate
+    message: "Review the design system and brand identity before planning."
     options: [approve, reject]
     on_reject: abort
 
@@ -85,7 +91,7 @@ steps:
 
   - id: review-analysis
     type: gate
-    message: "Review the analysis report before implementation. Continue only if critical issues are resolved or explicitly accepted."
+    message: "Review the analysis report, confirm the active feature branch is ready, and continue only if critical issues are resolved or explicitly accepted."
     options: [approve, reject]
     on_reject: abort
 
@@ -97,7 +103,7 @@ steps:
 
   - id: review-backend
     type: gate
-    message: "Review the backend slice before UI implementation starts."
+    message: "Review the backend slice on the feature branch before UI implementation starts."
     options: [approve, reject]
     on_reject: abort
 
@@ -107,8 +113,26 @@ steps:
     input:
       args: "{{ inputs.feature_name }}"
 
+  - id: test
+    command: speckit.test
+    integration: "{{ inputs.integration }}"
+    input:
+      args: "{{ inputs.feature_name }}"
+
+  - id: review-tests
+    type: gate
+    message: "Review the test results. All tests must pass before code review."
+    options: [approve, reject]
+    on_reject: abort
+
   - id: review-implementation
     type: gate
-    message: "Review the full implementation and run Code Reviewer before final verification."
+    message: "Run Code Reviewer on the full implementation. Address all critical findings before merge readiness."
+    options: [approve, reject]
+    on_reject: abort
+
+  - id: merge-readiness
+    type: gate
+    message: "Merge to main only after tests pass, review is addressed, and kite verify feature is green on the feature branch."
     options: [approve, reject]
     on_reject: abort

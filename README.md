@@ -2,17 +2,20 @@
 
 Reusable development container template for future projects.
 
-This repository packages three things together:
+This repository packages the following together:
 
 - a multi-profile `.devcontainer/` setup for base, Python, TypeScript, and fullstack work
 - workspace-managed VS Code prompt files in `.github/prompts/`
 - workspace-managed VS Code custom agents in `.github/agents/`
 - workspace-managed VS Code file-based instructions in `.github/instructions/`
+- repo-level workflow rules in `.github/copilot-instructions.md`
 - repo-managed Speckit preset and workflow assets in `spec-kit/`
+
+The bundled workflow follows a Strategist-led Software Design Document (SDD) cycle: Strategist clarifies the idea, constitution locks standards, Specify writes specs, Designer creates brand identity and design tokens, then the plan-tasks-analyze-implement-test-review pipeline runs on a feature branch.
 
 When a future project uses this repository's dev container setup, VS Code automatically detects and loads the bundled prompts, agents, and instructions from their workspace folders without needing any installation step.
 
-The installer copies `.devcontainer/`, `.github/prompts/`, `.github/agents/`, and `.github/instructions/` into the target project. Speckit presets and workflows are installed directly into `.specify/` without leaving a separate `spec-kit/` directory in the target repo.
+The installer copies `.devcontainer/`, `.github/prompts/`, `.github/agents/`, `.github/instructions/`, and `.github/copilot-instructions.md` into the target project. When the `.github/` folders or `.specify/` already exist, the installer merges in missing files by default and preserves the files that are already there. Speckit presets and workflows are installed directly into `.specify/` without leaving a separate `spec-kit/` directory in the target repo.
 
 ## Repository Layout
 
@@ -21,7 +24,6 @@ The installer copies `.devcontainer/`, `.github/prompts/`, `.github/agents/`, an
 - `.github/agents/`: workspace-scoped custom agents
 - `.github/instructions/`: workspace-scoped file-based instructions
 - `spec-kit/`: bundled Speckit preset and custom workflow assets
-- `extras/`: optional prompts and customizations not installed by default
 - `.speckit-version`: pinned Speckit CLI version used by the installer and CI
 - `install.sh`: CLI installer for pulling this setup into another repository
 
@@ -31,12 +33,18 @@ Quick paths:
 
 1. Host bootstrap only: `curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .`
 2. Host bootstrap plus host Speckit bootstrap: `curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- --with-speckit .`
-3. Host bootstrap first, then container-native Speckit bootstrap: `kite install speckit .` after reopening in the container
-4. Refresh copied workspace assets from inside the container: `kite update workspace .`
-5. Preview a workspace refresh without changing files: `kite update workspace --dry-run .`
-6. Diagnose the container-native setup: `kite doctor .`
-7. Check whether assets are current and Spec Kit is bootstrapped: `kite status .`
-8. Emit machine-readable status for scripts or CI: `kite status --json .`
+3. Host bootstrap first, then container-native Speckit bootstrap: `kite install speckit` after reopening in the container
+4. Refresh copied workspace assets from inside the container: `kite update workspace`
+5. Preview a workspace refresh without changing files: `kite update workspace --dry-run`
+6. Diagnose the container-native setup: `kite doctor`
+7. Check whether assets are current and Spec Kit is bootstrapped: `kite status`
+8. Run the dedicated pre-merge feature-branch verification step: `kite verify feature`
+9. Emit machine-readable status for scripts or CI: `kite status --json`
+10. Print shell completion setup for manual shell wiring: `kite completion bash`
+11. Run project tests (unit and optionally E2E): `kite test` or `kite test --e2e`
+12. Audit dependencies for security vulnerabilities: `kite audit` or `kite audit --fix`
+13. Scaffold a new project with dev-env and bundled Speckit assets: `kite new my-app --template fullstack --with-speckit`
+14. Bump version, tag, and prepare a release: `kite release --bump minor`
 
 From the target repository root:
 
@@ -44,9 +52,9 @@ From the target repository root:
 curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
 ```
 
-This installs `.devcontainer/`, `.github/prompts/`, `.github/agents/`, and `.github/instructions/` into the current project.
+This installs `.devcontainer/`, `.github/prompts/`, `.github/agents/`, `.github/instructions/`, and `.github/copilot-instructions.md` into the current project.
 
-If those directories already exist and you want to replace them:
+If those directories already exist, the installer merges in only the missing `.github/` files by default and preserves the files already present. If you explicitly want to replace the copied workspace assets:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- --force .
@@ -71,50 +79,68 @@ curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh |
 Then reopen the project in the dev container and run:
 
 ```bash
-kite install speckit .
+kite install speckit
 ```
 
 The `kite` command is installed by `.devcontainer/post-create.sh`, so once the container is ready you can bootstrap Spec Kit without any extra host-machine dependencies.
 
+Typing `kite` with no arguments opens a terminal home screen with the core commands and the expected branch-first Speckit flow.
+
+Inside the dev container, Bash completion for `kite` is installed automatically during post-create. If you ever need to wire it manually in another shell session, run `source <(kite completion bash)`.
+
 If you later update this repository and want to refresh the copied `.devcontainer/` and `.github/` assets from inside the container, run:
 
 ```bash
-kite update workspace .
+kite update workspace
 ```
 
 If you want that refresh to also bootstrap or refresh the bundled Spec Kit setup in the target repo, run:
 
 ```bash
-kite update workspace --with-speckit .
+kite update workspace --with-speckit
 ```
 
 To preview what `kite update workspace` would replace before writing changes, run:
 
 ```bash
-kite update workspace --dry-run .
+kite update workspace --dry-run
 ```
 
 To verify the repo is ready for the container-native workflow and get exact fix commands for anything missing, run:
 
 ```bash
-kite doctor .
+kite doctor
 ```
 
 To see whether the copied workspace assets are current and whether the bundled Spec Kit setup is already bootstrapped, run:
 
 ```bash
-kite status .
+kite status
 ```
+
+Before moving a feature branch into final merge review, run:
+
+```bash
+kite verify feature
+```
+
+That checks for a real feature branch, a clean working tree, merge conflicts, and incomplete active Speckit tasks when they can be identified.
 
 To get the same status data as JSON for scripts or CI checks, run:
 
 ```bash
-kite status --json .
+kite status --json
+```
+
+To print the Bash completion script explicitly, run:
+
+```bash
+kite completion bash
 ```
 
 For command-specific help, run commands such as `kite help update workspace` or `kite help doctor`.
 
-If the target already has `.specify/` and you intentionally want to reinitialize it, add `--force-speckit-init`.
+If the target already has `.specify/`, the installer merges in the missing Spec Kit files by default and preserves the files already present. If you intentionally want to replace the existing Spec Kit state, add `--force-speckit-init`.
 
 You can also run the installer from a local checkout of this repository:
 
@@ -162,7 +188,7 @@ bash install.sh --help
 
 Supported options:
 
-- `--force`: replace existing `.devcontainer/`, `.github/prompts/`, `.github/agents/`, and `.github/instructions/`
+- `--force`: replace existing copied `.devcontainer/` and `.github/` assets instead of merging missing files
 - `--dry-run`: show what would be installed without writing anything
 - `--with-speckit`: initialize Spec Kit and install the bundled preset and workflow
 - `--speckit-only`: initialize or update only Spec Kit assets without reinstalling `.devcontainer/` or `.github/`
@@ -179,9 +205,32 @@ The bundled Speckit assets live under `spec-kit/`.
 They are designed to support the workflow you described:
 
 - `spec-kit/presets/orchestrator-workflow/` replaces `speckit.constitution` so the agent asks questions before drafting the constitution.
-- `spec-kit/presets/orchestrator-workflow/commands/speckit.design.md` adds a design-system and UX step before specification.
-- `spec-kit/presets/orchestrator-workflow/commands/speckit.implement.md` turns implementation into a stricter coordination step that requires analysis and sequences backend before UI.
-- `spec-kit/workflows/orchestrator-design-first.yml` adds a design-first workflow with explicit analysis and backend/UI review gates.
+- `spec-kit/presets/orchestrator-workflow/commands/speckit.design.md` adds a design-system and brand identity step after specification, writing to `.specify/memory/design-direction.md`.
+- `spec-kit/presets/orchestrator-workflow/commands/speckit.test.md` adds a testing step that discovers and runs the project test suite after implementation.
+- `spec-kit/presets/orchestrator-workflow/commands/speckit.implement.md` turns implementation into a stricter coordination step that requires analysis, uses a feature branch, and sequences backend before UI.
+- `spec-kit/workflows/orchestrator-design-first.yml` defines the full Strategist-led SDD cycle: constitution → specify → design → plan → tasks → analyze → implement → test → review → merge-readiness.
+
+## Port Forwarding Policy
+
+The dev container no longer pre-forwards a bundle of common app ports on startup.
+
+Why you were seeing several ports open:
+
+- `.devcontainer/devcontainer.json` previously hardcoded a default `forwardPorts` list for common web and Python ports.
+- VS Code forwarded those to your host automatically whenever the container opened.
+
+Is it safe?
+
+- Safer than Docker-published ports, because VS Code forwarded ports are host-local tunnels rather than public network listeners by default.
+- Still noisier than necessary, and it can expose services on your local machine that the current repo is not actually using.
+
+Mitigation now in place:
+
+- No default ports are forwarded on container startup.
+- Restored forwarded ports are disabled for this container.
+- Unsolicited auto-forwarding is ignored unless you manually forward the port you want.
+
+If a project needs a port, forward it explicitly from the VS Code Ports view or add a repo-specific rule later.
 
 ## Speckit Stability
 

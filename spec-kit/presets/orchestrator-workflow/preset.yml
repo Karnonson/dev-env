@@ -41,6 +41,11 @@ provides:
       file: "commands/speckit.implement.ui.md"
       description: "Implement UI tasks from the active Speckit feature"
 
+    - type: "command"
+      name: "speckit.test"
+      file: "commands/speckit.test.md"
+      description: "Discover and run the project test suite against the active feature branch"
+
 tags:
   - "workflow"
   - "design"
