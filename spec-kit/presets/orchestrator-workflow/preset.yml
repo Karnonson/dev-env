@@ -6,7 +6,7 @@ preset:
   version: "1.1.0"
   description: "Design-aware Speckit customization with discovery and brief stages, question-first constitution setup, and split implementation guidance."
   author: "Karnon"
-  repository: "https://github.com/Karnonson/dev-env"
+  repository: "https://github.com/Karnonson/kite"
   license: "MIT"
 
 requires:

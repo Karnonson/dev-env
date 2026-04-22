@@ -217,7 +217,7 @@ dist/
 *.tsbuildinfo
 .eslintcache
 
-# Local dotfiles (user home when dev-env is checked out at ~)
+# Local dotfiles (user home when kite is checked out at ~)
 .bash_profile
 .bashrc
 .gitconfig

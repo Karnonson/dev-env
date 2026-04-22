@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-default_repo="Karnonson/dev-env"
+default_repo="Karnonson/kite"
 default_ref="main"
 repo="$default_repo"
 ref="$default_ref"
@@ -21,18 +21,18 @@ usage() {
   cat <<EOF
 Usage: install.sh [options] [target-directory]
 
-Install the dev-env .devcontainer and workspace chat customization assets into a target project.
+Install the kite .devcontainer and workspace chat customization assets into a target project.
 
 Options:
   --force             Replace existing workspace assets (.devcontainer, .github/*, docs/errors); preserve repo-local .kite/config.yml
   --dry-run           Show what would be installed without writing anything
   --with-speckit      Initialize Spec Kit and install the bundled preset/workflow
-  --speckit-only      Only install Spec Kit assets; do not copy dev-env workspace files
+  --speckit-only      Only install Spec Kit assets; do not copy kite workspace files
   --force-speckit-init Reinitialize Spec Kit when .specify already exists
   --speckit-version V Pin the Spec Kit CLI version used for bootstrap (default: $default_speckit_version)
   --ref REF           Git ref to download from (default: main)
-  --repo OWNER/REPO   GitHub repo to download from (default: Karnonson/dev-env)
-  --source-dir PATH   Use a local dev-env checkout instead of downloading
+  --repo OWNER/REPO   GitHub repo to download from (default: Karnonson/kite)
+  --source-dir PATH   Use a local kite checkout instead of downloading
   -h, --help          Show this help text
 
 Examples:
@@ -43,7 +43,7 @@ Examples:
   ./install.sh --with-speckit --speckit-only .
   ./install.sh --with-speckit --speckit-version $default_speckit_version .
   ./install.sh --force ../my-project
-  curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
+  curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- .
 EOF
 }
 
@@ -548,7 +548,7 @@ fi
 if [[ $speckit_only -eq 1 ]]; then
   echo "Installed Spec Kit customization into $target_dir"
 else
-  echo "Installed dev-env into $target_dir"
+  echo "Installed kite into $target_dir"
 fi
 if [[ $with_speckit -eq 1 ]]; then
   echo "Spec Kit bootstrap completed with version target $speckit_version."

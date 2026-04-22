@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-default_repo="Karnonson/dev-env"
+default_repo="Karnonson/kite"
 default_ref="main"
 
 repo="$default_repo"
@@ -75,7 +75,7 @@ Workspace commands:
   status             Show whether workspace assets are current and whether Spec Kit is bootstrapped
 
 Project commands:
-  new <name>         Scaffold a new project with dev-env assets
+  new <name>         Scaffold a new project with kite assets
   test               Detect stack and run the appropriate test suite
   audit              Run dependency audits and security checks
   release            Prepare or publish a gated release
@@ -116,15 +116,15 @@ Bootstrap the bundled Spec Kit preset and workflow into a target repo without re
 Options:
   --force-speckit-init  Reinitialize Spec Kit when .specify already exists
   --speckit-version V   Pin the Spec Kit CLI version used for bootstrap
-  --repo OWNER/REPO     Download dev-env assets from a different GitHub repository
-  --ref REF             Download dev-env assets from a different Git ref
-  --source-dir PATH     Use a local dev-env checkout instead of downloading
+  --repo OWNER/REPO     Download kite assets from a different GitHub repository
+  --ref REF             Download kite assets from a different Git ref
+  --source-dir PATH     Use a local kite checkout instead of downloading
   -h, --help            Show this help text
 
 Examples:
   kite install speckit .
   kite install speckit --force-speckit-init .
-  kite install speckit --source-dir /workspaces/dev-env .
+  kite install speckit --source-dir /path/to/kite .
 EOF
 }
 
@@ -147,9 +147,9 @@ Options:
   --with-speckit       Refresh workspace assets and bootstrap the bundled Spec Kit setup
   --force-speckit-init Reinitialize Spec Kit when .specify already exists
   --speckit-version V  Pin the Spec Kit CLI version used for bootstrap
-  --repo OWNER/REPO    Download dev-env assets from a different GitHub repository
-  --ref REF            Download dev-env assets from a different Git ref
-  --source-dir PATH    Use a local dev-env checkout instead of downloading
+  --repo OWNER/REPO    Download kite assets from a different GitHub repository
+  --ref REF            Download kite assets from a different Git ref
+  --source-dir PATH    Use a local kite checkout instead of downloading
   -h, --help           Show this help text
 
 Examples:
@@ -165,7 +165,7 @@ doctor_help() {
 Usage:
   kite doctor [options] [target-directory]
 
-Verify whether the target repo is ready for the container-native dev-env workflow.
+Verify whether the target repo is ready for the container-native kite workflow.
 
 Checks:
   - uv availability
@@ -178,12 +178,12 @@ Options:
   --speckit-version V  Include a pinned Spec Kit version in suggested fix commands
   --repo OWNER/REPO    Compare against a different GitHub repository
   --ref REF            Compare against a different Git ref
-  --source-dir PATH    Compare against a local dev-env checkout instead of downloading
+  --source-dir PATH    Compare against a local kite checkout instead of downloading
   -h, --help           Show this help text
 
 Examples:
   kite doctor .
-  kite doctor --source-dir /workspaces/dev-env .
+  kite doctor --source-dir /path/to/kite .
 EOF
 }
 
@@ -198,13 +198,13 @@ Options:
   --json               Emit machine-readable JSON output
   --repo OWNER/REPO    Compare against a different GitHub repository
   --ref REF            Compare against a different Git ref
-  --source-dir PATH    Compare against a local dev-env checkout instead of downloading
+  --source-dir PATH    Compare against a local kite checkout instead of downloading
   -h, --help           Show this help text
 
 Examples:
   kite status .
   kite status --json .
-  kite status --source-dir /workspaces/dev-env .
+  kite status --source-dir /path/to/kite .
 EOF
 }
 
@@ -259,7 +259,7 @@ new_help() {
 Usage:
   kite new [options] <project-name>
 
-Scaffold a new project with dev-env assets.
+Scaffold a new project with kite assets.
 
 Options:
   --template TYPE      Devcontainer profile: base, python, typescript, fullstack
@@ -269,9 +269,9 @@ Options:
   --with-speckit       Also bootstrap the bundled Spec Kit setup
   --speckit-version V  Pin the Spec Kit CLI version
   --git-init-commit    Create an initial git commit after scaffolding
-  --repo OWNER/REPO    Download dev-env assets from a different repository
-  --ref REF            Download dev-env assets from a different ref
-  --source-dir PATH    Use a local dev-env checkout
+  --repo OWNER/REPO    Download kite assets from a different repository
+  --ref REF            Download kite assets from a different ref
+  --source-dir PATH    Use a local kite checkout
   -h, --help           Show this help text
 
 Behavior:
@@ -1890,7 +1890,7 @@ HEREDOC
 
   if [[ $git_init_commit -eq 1 ]]; then
     git -C "$project_dir" add .
-    git -C "$project_dir" -c user.name='kite' -c user.email='kite@dev-env' commit -m 'chore: scaffold project with dev-env' --allow-empty >/dev/null
+    git -C "$project_dir" -c user.name='kite' -c user.email='kite@local' commit -m 'chore: scaffold project with kite' --allow-empty >/dev/null
   fi
 
   echo ""
@@ -2725,9 +2725,9 @@ run_doctor() {
   fi
 
   if [[ -f "$target_dir/.dev-env-version" ]]; then
-    echo "[ok] dev-env version stamp present"
+    echo "[ok] workspace version stamp present"
   else
-    echo "[info] no .dev-env-version stamp (run kite update workspace to add one)"
+    echo "[info] no workspace version stamp found (run kite update workspace to add one)"
   fi
 
   if has_speckit_bootstrap "$target_dir"; then

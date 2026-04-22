@@ -1,4 +1,4 @@
-# dev-env
+# kite
 
 Reusable development container template for future projects.
 
@@ -35,8 +35,8 @@ The installer copies `.devcontainer/`, `.github/prompts/`, `.github/agents/`, `.
 
 Quick paths:
 
-1. Host bootstrap only: `curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .`
-2. Host bootstrap plus host Speckit bootstrap: `curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- --with-speckit .`
+1. Host bootstrap only: `curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- .`
+2. Host bootstrap plus host Speckit bootstrap: `curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- --with-speckit .`
 3. Host bootstrap first, then container-native Speckit bootstrap: `kite install speckit` after reopening in the container
 4. Refresh copied workspace assets from inside the container: `kite update workspace`
 5. Preview a workspace refresh without changing files: `kite update workspace --dry-run`
@@ -47,14 +47,14 @@ Quick paths:
 10. Print shell completion setup for manual shell wiring: `kite completion bash`
 11. Run project tests (unit and optionally E2E): `kite test` or `kite test --e2e`
 12. Audit dependencies for security vulnerabilities: `kite audit` or `kite audit --fix`
-13. Scaffold a new project with dev-env and bundled Speckit assets: `kite new my-app --template fullstack --with-speckit`
+13. Scaffold a new project with kite and bundled Speckit assets: `kite new my-app --template fullstack --with-speckit`
 14. Prepare a release on a feature branch: `kite release prepare --bump minor`
 15. Publish it from `main` after merge: `kite release publish --bump minor --confirm`
 
 From the target repository root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
+curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- .
 ```
 
 This installs `.devcontainer/`, `.github/prompts/`, `.github/agents/`, `.github/instructions/`, `.github/copilot-instructions.md`, and `docs/errors/` into the current project, and seeds `.kite/config.yml` if that file is missing.
@@ -62,13 +62,13 @@ This installs `.devcontainer/`, `.github/prompts/`, `.github/agents/`, `.github/
 If those directories already exist, the installer merges in only the missing `.github/` files by default and preserves the files already present. If you explicitly want to replace the copied workspace assets:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- --force .
+curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- --force .
 ```
 
 To install the environment and bootstrap Speckit in the target project too:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- --with-speckit .
+curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- --with-speckit .
 ```
 
 _Note: The `--with-speckit` flag requires `uv` (specifically `uvx`) or `specify` to be installed on your machine. If you don't have those, you can run the basic install command on your host machine, rebuild the container, and then run the `--with-speckit` command from inside the container where `uv` is available by default._
@@ -78,7 +78,7 @@ That creates `.specify/` plus the generated Speckit command files under `.github
 If you prefer not to install Spec Kit from the host at all, use a two-step flow:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
+curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- .
 ```
 
 Then reopen the project in the dev container and run:
@@ -214,7 +214,7 @@ Supported options:
 - `--speckit-version`: pin the Spec Kit CLI version used for bootstrap
 - `--ref`: install from a different Git ref
 - `--repo`: install from a different GitHub repository
-- `--source-dir`: install from a local dev-env checkout instead of downloading
+- `--source-dir`: install from a local kite checkout instead of downloading
 
 ## Speckit Customization
 
@@ -277,7 +277,7 @@ Recommended approach for tailoring Speckit to your preferences:
 2. Use a custom workflow to change the native stage order.
 3. Keep repo-wide rules in `.github/copilot-instructions.md` so Speckit artifacts and your custom agents agree on ownership and handoff rules.
 
-Example commands from a local `dev-env` checkout:
+Example commands from a local `kite` checkout:
 
 ```bash
 bash install.sh --with-speckit --source-dir "$PWD" ../my-project
