@@ -30,7 +30,7 @@ Use this command when the user has a feature idea but needs a structured artifac
    - run the Marketer agent
    - store the durable output at `specs/<feature>/market-validation.md`
    - fold the key findings back into the discovery artifact
-   If the user declines, record that market validation was skipped.
+     If the user declines, record that market validation was skipped.
 5. Write the canonical discovery artifact to `specs/<feature>/discovery.md`.
 6. Open the file with the artifact front matter block described in `spec-kit/templates/artifact-front-matter.md`. Set `stage: discover`, `last_agent: speckit.discover`, refresh `updated_at`, and preserve `created_at` if it already exists.
 7. Keep the artifact plain-language and decision-oriented. Surface open risks explicitly instead of smoothing them over.

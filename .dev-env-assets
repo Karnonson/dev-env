@@ -1,7 +1,11 @@
 # dev-env asset manifest
+
 # Each line is a workspace asset path (relative to repo root).
+
 # Directories are copied/compared recursively; files individually.
+
 # Lines starting with # are comments. Blank lines are ignored.
+
 .devcontainer
 .github/prompts
 .github/agents

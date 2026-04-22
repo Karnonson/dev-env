@@ -21,15 +21,15 @@ updated_at: <YYYY-MM-DD>
 
 ## Field reference
 
-| Field | Purpose | Notes |
-|-------|---------|-------|
-| `stage` | Lifecycle stage this artifact belongs to | Must match one of the stages listed by `kite explain`. |
-| `feature` | Feature slug | Matches the directory name under `specs/` and `.specify/feature.json` name. |
-| `status` | Editorial state | `draft` while being written; `in-review` when awaiting review; `approved` once signed off; `archived` for superseded artifacts. |
-| `owner` | Accountable human or role | Example: `@karnon`, `Product`, `Backend Dev`. |
-| `last_agent` | Last agent to touch the file | Example: `Designer`, `speckit.plan`, `Backend Dev`. |
-| `created_at` | ISO date the artifact was first written | Immutable. |
-| `updated_at` | ISO date of the most recent meaningful edit | Update when content changes. |
+| Field        | Purpose                                     | Notes                                                                                                                           |
+| ------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `stage`      | Lifecycle stage this artifact belongs to    | Must match one of the stages listed by `kite explain`.                                                                          |
+| `feature`    | Feature slug                                | Matches the directory name under `specs/` and `.specify/feature.json` name.                                                     |
+| `status`     | Editorial state                             | `draft` while being written; `in-review` when awaiting review; `approved` once signed off; `archived` for superseded artifacts. |
+| `owner`      | Accountable human or role                   | Example: `@karnon`, `Product`, `Backend Dev`.                                                                                   |
+| `last_agent` | Last agent to touch the file                | Example: `Designer`, `speckit.plan`, `Backend Dev`.                                                                             |
+| `created_at` | ISO date the artifact was first written     | Immutable.                                                                                                                      |
+| `updated_at` | ISO date of the most recent meaningful edit | Update when content changes.                                                                                                    |
 
 ## Applies to
 

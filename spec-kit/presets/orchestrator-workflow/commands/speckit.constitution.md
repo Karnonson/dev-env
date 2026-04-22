@@ -35,8 +35,10 @@ If key answers are missing, stop after asking the minimum set of questions neede
 4. Ensure the constitution captures, when requested by the user:
    - a mandatory design step for UI-heavy work before specification or implementation
    - the preferred use of backend and UI specialists for implementation
-  - a feature-branch workflow where work stays off `main` until verification and review are complete
-   - review, testing, and document-ownership expectations
+
+- a feature-branch workflow where work stays off `main` until verification and review are complete
+- review, testing, and document-ownership expectations
+
 5. Update `.specify/memory/constitution.md` in place.
 6. Ensure the file opens with the artifact front matter block described in `spec-kit/templates/artifact-front-matter.md`. Set `stage: constitution`, `last_agent: speckit.constitution`, refresh `updated_at`, and preserve `created_at` if it already exists.
 7. Summarize the resulting principles and any follow-up commands the user should run next.
