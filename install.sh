@@ -24,7 +24,7 @@ Usage: install.sh [options] [target-directory]
 Install the dev-env .devcontainer and workspace chat customization assets into a target project.
 
 Options:
-  --force             Replace existing .devcontainer, .github/prompts, .github/agents, .github/instructions, and copilot-instructions.md
+  --force             Replace existing workspace assets (.devcontainer, .github/*, docs/errors); preserve repo-local .kite/config.yml
   --dry-run           Show what would be installed without writing anything
   --with-speckit      Initialize Spec Kit and install the bundled preset/workflow
   --speckit-only      Only install Spec Kit assets; do not copy dev-env workspace files
@@ -66,6 +66,8 @@ has_speckit_templates() {
   local required_file
   local required_files=(
     .specify/presets/orchestrator-workflow/preset.yml
+    .specify/presets/orchestrator-workflow/commands/speckit.discover.md
+    .specify/presets/orchestrator-workflow/commands/speckit.brief.md
     .specify/presets/orchestrator-workflow/commands/speckit.constitution.md
     .specify/presets/orchestrator-workflow/commands/speckit.design.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.md
@@ -175,7 +177,7 @@ trap cleanup EXIT
 
 asset_merges_missing_by_default() {
   case "$1" in
-    .github/prompts|.github/agents|.github/instructions|.github/copilot-instructions.md)
+    .github/prompts|.github/agents|.github/instructions|.github/copilot-instructions.md|docs/errors)
       return 0
       ;;
     *)
@@ -221,6 +223,17 @@ merge_missing_file() {
   if [[ ! -f "$target_path" ]]; then
     cp "$source_path" "$target_path"
   fi
+}
+
+sync_repo_local_kite_config() {
+  local source_config_dir="$1/.kite"
+  local target_config_dir="$2/.kite"
+
+  if [[ ! -d "$source_config_dir" ]]; then
+    return
+  fi
+
+  merge_missing_tree "$source_config_dir" "$target_config_dir"
 }
 
 ensure_git_main_branch_preference() {
@@ -445,6 +458,13 @@ if [[ $dry_run -eq 1 ]]; then
         echo "  create  $asset"
       fi
     done
+    if [[ -d "$source_root/.kite" ]]; then
+      if [[ -e "$target_dir/.kite" ]]; then
+        echo "  merge   .kite"
+      else
+        echo "  create  .kite"
+      fi
+    fi
   fi
   if [[ $with_speckit -eq 1 ]]; then
     if has_speckit_templates && [[ $force_speckit_init -ne 1 ]]; then
@@ -503,6 +523,8 @@ if [[ $speckit_only -ne 1 ]]; then
     mkdir -p "$(dirname "$target_dir/$asset")"
     cp -R "$source_root/$asset" "$target_dir/$asset"
   done
+
+  sync_repo_local_kite_config "$source_root" "$target_dir"
 fi
 
 if [[ $with_speckit -eq 1 ]]; then

@@ -3,8 +3,8 @@ schema_version: "1.0"
 preset:
   id: "orchestrator-workflow"
   name: "Orchestrator Workflow"
-  version: "1.0.0"
-  description: "Design-aware Speckit customization with question-first constitution setup and split implementation guidance."
+  version: "1.1.0"
+  description: "Design-aware Speckit customization with discovery and brief stages, question-first constitution setup, and split implementation guidance."
   author: "Karnon"
   repository: "https://github.com/Karnonson/dev-env"
   license: "MIT"
@@ -14,6 +14,16 @@ requires:
 
 provides:
   templates:
+    - type: "command"
+      name: "speckit.discover"
+      file: "commands/speckit.discover.md"
+      description: "Guide front-of-lifecycle discovery and optionally validate market risk before specification"
+
+    - type: "command"
+      name: "speckit.brief"
+      file: "commands/speckit.brief.md"
+      description: "Write a plain-language product brief before constitution and specification"
+
     - type: "command"
       name: "speckit.constitution"
       file: "commands/speckit.constitution.md"
@@ -48,6 +58,7 @@ provides:
 
 tags:
   - "workflow"
+  - "discovery"
   - "design"
   - "copilot"
   - "speckit"

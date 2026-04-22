@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 - DevOps agent for CI/CD, deployment, and infrastructure work
 - `speckit.test` command for running project test suites after implementation
 - `kite test`, `kite audit`, `kite new`, `kite release` commands
+- `.kite/config.yml` defaults for scaffold choices
+- `docs/errors/*` recovery pages for `kite verify feature`
 - Strategist-led SDD workflow with explicit gate at pipeline entry
 - `shellcheck` and `yamllint` pre-installed in devcontainer
 - `.github/copilot-instructions.md` for repo-level workflow alignment
@@ -17,9 +19,13 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Workflow reordered: Strategist → Constitution → Specify → Designer → Plan → Tasks → Analyze → Implement → Test → Review → Verify
+- Workflow gates now include rubric-style checklists in `orchestrator-design-first.yml`
 - Designer now runs after specification (not before)
 - Design direction written to `.specify/memory/design-direction.md`
 - Orchestrator agents list includes all speckit commands
+- `kite new` now offers picker-driven defaults for template, license, deploy target, and test tier
+- `kite release` now uses `prepare` and `publish` steps with feature-branch gating, publish-time dry runs, and release-note previews sourced from merged PR titles plus `[Unreleased]`
+- installer seeds `.kite/config.yml` without overwriting existing repo-local choices
 
 ### Fixed
 

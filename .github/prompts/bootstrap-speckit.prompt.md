@@ -61,9 +61,6 @@ Adjust only when the user explicitly overrides the version or branch numbering.
 
 Operational rules:
 
-- When running `specify init` from chat or other automated terminals, always pass an explicit script type so the CLI does not pause on the script selector. Use `--script sh` on POSIX environments and `--script ps` on Windows.
-- Standard terminal sandboxing often blocks outbound network access to GitHub or package registries. Since `uvx` drops to a network fetch (`git+https://...`), you SHOULD proactively request unsandboxed execution (`requestUnsandboxedExecution: true`) with a clear reason.
-- If you do attempt in a sandbox first and it fails with a network, package resolution, or file-system error, immediately retry unsandboxed with a clear reason instead of asking the user or giving up.
 - If `uvx` is unavailable, check whether `uv` or `specify` is already installed.
 - If neither `uvx`, `uv`, nor `specify` is available, stop and report the prerequisite gap clearly instead of improvising another installer.
 
@@ -117,7 +114,7 @@ If `.github/copilot-instructions.md` does not exist, create it with this baselin
 ## Speckit Awareness
 
 - Treat Speckit as installed when the repo contains `.specify/` and Speckit agents or prompts under `.github/agents/` or `.github/prompts/`.
-- When Speckit is installed, treat `specs/<feature>/spec.md`, `plan.md`, and `tasks.md` as the canonical feature artifacts.
+- When Speckit is installed, treat `specs/<feature>/discovery.md`, `brief.md`, `spec.md`, `plan.md`, and `tasks.md` as the canonical feature artifacts when they exist.
 - Do not create alternate feature specs, plans, or task lists under `team/` when canonical Speckit artifacts already exist.
 
 ## Agent Workflow
@@ -126,8 +123,8 @@ If `.github/copilot-instructions.md` does not exist, create it with this baselin
 - Use ideation agents such as Strategist to explore and pressure-test ideas first.
 - Use Designer only when a feature needs design-system decisions, visual direction, or UX clarification before specification and frontend implementation.
 - Backend Dev and UI Builder are the primary implementation agents.
-- If a durable idea brief or handoff is useful before specification, store it under `team/agents/<agent-name>/YYYY-MM-DD-<feature-name>.md`.
-- Once a feature direction is approved, hand off a concise feature statement to `speckit.specify`.
+- If Speckit is not installed yet and a durable idea note is useful before canonical discovery starts, store it under `team/agents/<agent-name>/YYYY-MM-DD-<feature-name>.md`.
+- Once a feature direction is approved, start the canonical front-of-lifecycle sequence with `speckit.discover`, then `speckit.brief`, `speckit.constitution`, and `speckit.specify`.
 - Let Speckit own specification, clarification, planning, tasks, and consistency analysis.
 - Do implementation work on the active feature branch and keep `main` as the merge target only after verification and review are complete.
 - After `speckit.tasks`, implementation agents must execute from the active `tasks.md` and reference relevant FR IDs, user stories, or task IDs from the matching Speckit artifact set.

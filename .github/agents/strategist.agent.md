@@ -205,7 +205,9 @@ When handing off to Marketer, include the current strategist note path if you al
 
 - **Marketer (subagent)**: Use when audience or problem validation is fuzzy. **Required** when you judge **no viable market** (or equivalent) — see **Mandatory Marketer handoff**; the Marketer validates or refutes with evidence before more investment.
 - **Designer (subagent)**: Use when the feature is UI-heavy and the UX flows, interaction model, visual direction, or design-system decisions are still unresolved. Designer defines the direction before specification; UI Builder implements it later.
-- **speckit.specify (subagent)**: Use when the idea is concrete enough to become a real feature, the user wants to move into specification, and the repo has Speckit installed. Route through `speckit.constitution` first to lock project standards, then pass a concise feature statement, target users, scope, constraints, and open assumptions to `speckit.specify`. Ask for confirmation before invoking it because it creates canonical feature artifacts.
+- **speckit.discover (subagent)**: Use when the idea is concrete enough to become a real feature, the user wants to move into the formal Speckit flow, and the repo has Speckit installed. Pass the concise feature statement, likely users, open assumptions, and current risks. Ask for confirmation before invoking it because it creates canonical feature artifacts.
+- **speckit.brief (subagent)**: Use when discovery is approved and the user wants a stakeholder-readable product brief before technical specification.
+- **speckit.specify (subagent)**: Use when the brief is approved and project standards are locked. Route through `speckit.constitution` after the brief, then pass the approved brief context, constraints, and open assumptions to `speckit.specify`.
 - **When Marketer asks for validation:** Review the evidence pack critically, challenge weak inferences, check whether the wedge is actually supported, and return a short verdict: `confirmed`, `partially confirmed`, or `not confirmed`, with the top reasons.
 - **When edits are needed:** Marketer can recommend documentation changes, but only **Strategist** performs the edits.
 - **When logging is needed:** Marketer can recommend what should be preserved, but only **Strategist** writes the dated brief and dated findings files.
@@ -215,7 +217,7 @@ When handing off to Marketer, include the current strategist note path if you al
 - **Before Idea Validation (Marketer):** If the user has a *solution* but no clear *problem* or *audience*, **or** after **Mandatory Marketer handoff** (no market / no audience / no differentiation).
    > Use the full template under **Mandatory Marketer handoff** — not a one-line question — and invoke Marketer yourself after user confirmation.
 - **Before Specification (Designer):** If the feature is UI-heavy and the experience, flows, states, or visual direction are still unclear, recommend that Designer (or `speckit.design`) runs **after** `speckit.specify` to create the design system based on the approved spec. The `speckit.design` command automates writing the canonical design direction to `.specify/memory/design-direction.md`.
-- **To enter specification (speckit.specify):** When the idea is good enough to brief, the user wants a formal feature workflow, Speckit is installed, and the Strategist has produced a clear brief. Route through `speckit.constitution` first to lock project standards, then hand off to `speckit.specify`.
+- **To enter the formal Speckit flow (speckit.discover):** When the idea is good enough to brief, the user wants a formal feature workflow, Speckit is installed, and the Strategist has produced a clear summary. Hand off to `speckit.discover` first. After discovery and brief approval, route through `speckit.constitution` and `speckit.specify`.
 
 ### Review loop
 
@@ -269,7 +271,7 @@ When that bar is met:
 3. **State open assumptions**: List the biggest unanswered risks or validation questions.
 4. **Transition**: Offer market validation with **Marketer** when the user wants evidence before building.
 5. **Design handoff when needed**: If the feature is UI-heavy and design direction is still unresolved, hand it to `Designer` before specification.
-6. **Specification handoff**: If the user wants to proceed and Speckit is installed, hand the approved feature statement to `speckit.specify` instead of creating a parallel spec under `team/`.
+6. **Formal workflow handoff**: If the user wants to proceed and Speckit is installed, hand the approved feature statement to `speckit.discover` instead of jumping straight to `speckit.specify` or creating a parallel spec under `team/`.
 
 **Hand-off Command:**
 

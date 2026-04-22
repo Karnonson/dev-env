@@ -1,0 +1,12 @@
+# Repo-local defaults for the kite workflow.
+schema_version: 1
+
+scaffold:
+  template: base
+  license: MIT
+
+workflow:
+  test_tier: standard
+
+deploy:
+  target: none

@@ -1,11 +1,15 @@
+---
 schema_version: "1.0"
 
 workflow:
   id: "orchestrator-design-first"
   name: "Strategist-Led SDD Cycle"
-  version: "2.0.0"
+  version: "2.2.0"
   author: "Karnon"
-  description: "Strategist -> constitution -> specify -> design -> plan -> tasks -> analyze -> backend -> UI -> test -> review on a feature branch with explicit gates."
+  description: >
+    Strategist -> discover -> brief -> constitution -> specify -> design ->
+    plan -> tasks -> analyze -> backend -> UI -> test -> review on a
+    feature branch with explicit gates.
 
 requires:
   speckit_version: ">=0.6.1"
@@ -20,13 +24,73 @@ inputs:
   integration:
     type: string
     default: "copilot"
-    prompt: "Integration to use (e.g. copilot, claude, gemini)"
+    prompt: >
+      Integration to use (e.g. copilot, claude, gemini)
 
 steps:
   - id: strategist-preamble
     type: gate
-    message: "Before running this pipeline, the Strategist should have already explored and approved the feature idea interactively. Confirm the idea is ready for the formal SDD cycle."
+    message: |
+      Before running this pipeline, confirm the idea is ready for structured
+      discovery.
+
+      Checklist:
+      - There is a concrete problem or opportunity to explore.
+      - A likely primary user or buyer is identifiable, even if some details
+        still need discovery.
+      - The feature name describes the outcome, not just an implementation
+        detail.
+      - The team wants a guided discovery -> brief -> Speckit workflow.
+
+      Reject if there is not yet a concrete idea to shape.
     options: [approve, abort]
+    on_reject: abort
+
+  - id: discover
+    command: speckit.discover
+    integration: "{{ inputs.integration }}"
+    input:
+      args: "{{ inputs.feature_name }}"
+
+  - id: review-discovery
+    type: gate
+    message: |
+      Review the discovery artifact before drafting the product brief.
+
+      Checklist:
+      - Problem, target user, and desired outcome are explicit in plain
+        language.
+      - The riskiest assumption and at least one success metric are captured.
+      - Out-of-scope items and major risks are visible.
+      - If market-fit uncertainty is material, Marketer findings are attached
+        or the decision to skip them is explicit.
+
+      Reject if the brief would still be built on guesswork.
+    options: [approve, reject]
+    on_reject: abort
+
+  - id: brief
+    command: speckit.brief
+    integration: "{{ inputs.integration }}"
+    input:
+      args: "{{ inputs.feature_name }}"
+
+  - id: review-brief
+    type: gate
+    message: |
+      Review the plain-language brief before constitution and specification.
+
+      Checklist:
+      - Problem, user, value, constraints, success metric, and non-goals are
+        clear.
+      - Non-technical stakeholders can read it without translation.
+      - Product sign-off is explicit or the open approval step is documented.
+      - The technical spec can be derived from the brief without inventing
+        product intent.
+
+      Reject if constitution or specification would still need to guess what
+      the product is trying to achieve.
+    options: [approve, reject]
     on_reject: abort
 
   - id: constitution
@@ -37,7 +101,16 @@ steps:
 
   - id: review-constitution
     type: gate
-    message: "Review the project principles before specification starts. The Strategist should have already clarified the feature idea before this point."
+    message: |
+      Review the project principles before specification starts.
+
+      Checklist:
+      - Non-negotiable standards are explicit and realistic for this repo.
+      - Defaults and guardrails are clear enough to judge later artifacts.
+      - Policy gaps are resolved or intentionally deferred.
+      - The document matches the kind of product being built.
+
+      Reject if later stages would need to guess what the standards mean.
     options: [approve, reject]
     on_reject: abort
 
@@ -49,7 +122,16 @@ steps:
 
   - id: review-spec
     type: gate
-    message: "Review the generated spec before the design pass."
+    message: |
+      Review the generated spec before the design pass.
+
+      Checklist:
+      - Problem statement and user value are explicit.
+      - Acceptance criteria are observable and testable.
+      - Out-of-scope items are called out.
+      - Open questions or assumptions are visible.
+
+      Reject if design or implementation would need to guess core requirements.
     options: [approve, reject]
     on_reject: abort
 
@@ -61,7 +143,17 @@ steps:
 
   - id: review-design
     type: gate
-    message: "Review the design system and brand identity before planning."
+    message: |
+      Review the design system and brand identity before planning.
+
+      Checklist:
+      - The design direction supports the approved spec.
+      - Key states, accessibility expectations, and responsive behavior are
+        covered.
+      - Visual rules are concrete enough for UI implementation.
+      - Risky UX decisions are called out before technical planning starts.
+
+      Reject if planning would still need to invent important product behavior.
     options: [approve, reject]
     on_reject: abort
 
@@ -73,7 +165,16 @@ steps:
 
   - id: review-plan
     type: gate
-    message: "Review the plan before generating tasks."
+    message: |
+      Review the plan before generating tasks.
+
+      Checklist:
+      - Scope still matches the brief and spec.
+      - Risks are listed and each has a mitigation or owner.
+      - Phasing makes sense for the feature shape.
+      - Out-of-scope work is explicit.
+
+      Reject if the task list would inherit unresolved architectural confusion.
     options: [approve, reject]
     on_reject: abort
 
@@ -91,7 +192,16 @@ steps:
 
   - id: review-analysis
     type: gate
-    message: "Review the analysis report, confirm the active feature branch is ready, and continue only if critical issues are resolved or explicitly accepted."
+    message: |
+      Review the analysis report before implementation continues.
+
+      Checklist:
+      - Critical gaps or contradictions are resolved or consciously accepted.
+      - Missing tasks or missing acceptance coverage are captured.
+      - The active feature branch is ready for implementation work.
+      - Follow-up decisions are written down instead of left implicit.
+
+      Reject if critical issues are still unresolved.
     options: [approve, reject]
     on_reject: abort
 
@@ -103,7 +213,18 @@ steps:
 
   - id: review-backend
     type: gate
-    message: "Review the backend slice on the feature branch before UI implementation starts."
+    message: |
+      Review the backend slice on the feature branch before UI
+      implementation starts.
+
+      Checklist:
+      - Contracts, schema/data changes, and rollback concerns are covered.
+      - Backend tasks touched by this slice are complete or deliberately
+        deferred.
+      - The UI can proceed against a stable contract.
+      - Risky operational or migration details are documented.
+
+      Reject if the frontend would still be building against guesswork.
     options: [approve, reject]
     on_reject: abort
 
@@ -121,18 +242,45 @@ steps:
 
   - id: review-tests
     type: gate
-    message: "Review the test results. All tests must pass before code review."
+    message: |
+      Review the test results before code review.
+
+      Checklist:
+      - Relevant automated checks passed.
+      - Manual checks or known gaps are documented.
+      - Coverage matches the intended confidence level for this feature.
+      - Flakes, skips, or failures are resolved or explicitly accepted.
+
+      Reject if review would start without trustworthy verification.
     options: [approve, reject]
     on_reject: abort
 
   - id: review-implementation
     type: gate
-    message: "Run Code Reviewer on the full implementation. Address all critical findings before merge readiness."
+    message: |
+      Run Code Reviewer on the full implementation before merge readiness.
+
+      Checklist:
+      - Code Reviewer has run on the full slice.
+      - Critical findings are fixed.
+      - User-visible behavior matches the spec and design.
+      - Docs, config, and follow-up tasks are updated.
+
+      Reject if merge readiness depends on unresolved review debt.
     options: [approve, reject]
     on_reject: abort
 
   - id: merge-readiness
     type: gate
-    message: "Merge to main only after tests pass, review is addressed, and kite verify feature is green on the feature branch."
+    message: |
+      Merge to main only when the branch is fully review-ready.
+
+      Checklist:
+      - `kite verify feature` is green on the feature branch.
+      - Review feedback is addressed or explicitly accepted.
+      - Release or operate follow-ups are captured when needed.
+      - The branch is ready to merge without surprise cleanup.
+
+      Reject if merge would still rely on last-minute cleanup.
     options: [approve, reject]
     on_reject: abort

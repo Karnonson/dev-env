@@ -28,6 +28,6 @@ Use this command after `speckit.specify` has produced a canonical spec. The desi
    - accessibility requirements: contrast ratios, keyboard navigation, screen reader support
    - responsive breakpoints and behavior
    - any open risks or assumptions
-5. Store the canonical design direction at `.specify/memory/design-direction.md` so implementation agents can reference it directly.
+5. Store the canonical design direction at `.specify/memory/design-direction.md` so implementation agents can reference it directly. Open the file with the artifact front matter block described in `spec-kit/templates/artifact-front-matter.md`. Set `stage: design`, `last_agent: speckit.design`, refresh `updated_at`, and preserve `created_at` if it already exists.
 6. Store detailed design-system notes under `team/agents/designer/YYYY-MM-DD-<feature-name>.md` when a durable artifact is useful.
 7. End with a handoff-ready summary for `speckit.plan`.

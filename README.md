@@ -5,9 +5,11 @@ Reusable development container template for future projects.
 This repository packages the following together:
 
 - a multi-profile `.devcontainer/` setup for base, Python, TypeScript, and fullstack work
+- repo-local `.kite/config.yml` defaults for picker-driven workflow choices
 - workspace-managed VS Code prompt files in `.github/prompts/`
 - workspace-managed VS Code custom agents in `.github/agents/`
 - workspace-managed VS Code file-based instructions in `.github/instructions/`
+- support docs under `docs/errors/` for guided CLI recovery
 - repo-level workflow rules in `.github/copilot-instructions.md`
 - repo-managed Speckit preset and workflow assets in `spec-kit/`
 
@@ -15,14 +17,16 @@ The bundled workflow follows a Strategist-led Software Design Document (SDD) cyc
 
 When a future project uses this repository's dev container setup, VS Code automatically detects and loads the bundled prompts, agents, and instructions from their workspace folders without needing any installation step.
 
-The installer copies `.devcontainer/`, `.github/prompts/`, `.github/agents/`, `.github/instructions/`, and `.github/copilot-instructions.md` into the target project. When the `.github/` folders or `.specify/` already exist, the installer merges in missing files by default and preserves the files that are already there. Speckit presets and workflows are installed directly into `.specify/` without leaving a separate `spec-kit/` directory in the target repo.
+The installer copies `.devcontainer/`, `.github/prompts/`, `.github/agents/`, `.github/instructions/`, `.github/copilot-instructions.md`, and `docs/errors/` into the target project. It also seeds `.kite/config.yml` when that file is missing and preserves existing repo-local config choices. When the `.github/` folders or `.specify/` already exist, the installer merges in missing files by default and preserves the files that are already there. Speckit presets and workflows are installed directly into `.specify/` without leaving a separate `spec-kit/` directory in the target repo.
 
 ## Repository Layout
 
 - `.devcontainer/`: container build, bootstrap, and profile-switching scripts
+- `.kite/`: repo-local defaults for scaffold choices and future workflow decisions
 - `.github/prompts/`: workspace-scoped slash-command prompt files
 - `.github/agents/`: workspace-scoped custom agents
 - `.github/instructions/`: workspace-scoped file-based instructions
+- `docs/errors/`: short recovery guides for common `kite` failures
 - `spec-kit/`: bundled Speckit preset and custom workflow assets
 - `.speckit-version`: pinned Speckit CLI version used by the installer and CI
 - `install.sh`: CLI installer for pulling this setup into another repository
@@ -44,7 +48,8 @@ Quick paths:
 11. Run project tests (unit and optionally E2E): `kite test` or `kite test --e2e`
 12. Audit dependencies for security vulnerabilities: `kite audit` or `kite audit --fix`
 13. Scaffold a new project with dev-env and bundled Speckit assets: `kite new my-app --template fullstack --with-speckit`
-14. Bump version, tag, and prepare a release: `kite release --bump minor`
+14. Prepare a release on a feature branch: `kite release prepare --bump minor`
+15. Publish it from `main` after merge: `kite release publish --bump minor --confirm`
 
 From the target repository root:
 
@@ -52,7 +57,7 @@ From the target repository root:
 curl -fsSL https://raw.githubusercontent.com/Karnonson/dev-env/main/install.sh | bash -s -- .
 ```
 
-This installs `.devcontainer/`, `.github/prompts/`, `.github/agents/`, `.github/instructions/`, and `.github/copilot-instructions.md` into the current project.
+This installs `.devcontainer/`, `.github/prompts/`, `.github/agents/`, `.github/instructions/`, `.github/copilot-instructions.md`, and `docs/errors/` into the current project, and seeds `.kite/config.yml` if that file is missing.
 
 If those directories already exist, the installer merges in only the missing `.github/` files by default and preserves the files already present. If you explicitly want to replace the copied workspace assets:
 
@@ -125,6 +130,19 @@ kite verify feature
 ```
 
 That checks for a real feature branch, a clean working tree, merge conflicts, and incomplete active Speckit tasks when they can be identified.
+When a check fails, `kite` prints a short recovery block and links to the matching page under `docs/errors/`.
+
+`kite new` now records template, license, deploy target, and default test tier in `.kite/config.yml` so those choices are visible and editable later. Existing `.kite/config.yml` files are preserved during `kite update workspace`.
+
+`kite release` now uses a two-step flow:
+
+```bash
+kite release prepare --bump minor
+# merge the feature branch
+kite release publish --bump minor --confirm
+```
+
+`kite release prepare` runs `kite verify feature`, `kite test`, and `kite audit` on the feature branch and previews the next version and release notes. `kite release publish` runs test and audit again on the default branch, combines merged PR titles with the `[Unreleased]` section from `CHANGELOG.md`, and only mutates version/changelog/tag state when `--confirm` is passed. Use `--dry-run` or omit `--confirm` to preview the publish step without writing changes.
 
 To get the same status data as JSON for scripts or CI checks, run:
 
@@ -204,11 +222,13 @@ The bundled Speckit assets live under `spec-kit/`.
 
 They are designed to support the workflow you described:
 
+- `spec-kit/presets/orchestrator-workflow/commands/speckit.discover.md` adds a structured discovery step that writes `specs/<feature>/discovery.md` and can optionally capture market validation.
+- `spec-kit/presets/orchestrator-workflow/commands/speckit.brief.md` adds a plain-language product brief before constitution and specification, writing `specs/<feature>/brief.md`.
 - `spec-kit/presets/orchestrator-workflow/` replaces `speckit.constitution` so the agent asks questions before drafting the constitution.
 - `spec-kit/presets/orchestrator-workflow/commands/speckit.design.md` adds a design-system and brand identity step after specification, writing to `.specify/memory/design-direction.md`.
 - `spec-kit/presets/orchestrator-workflow/commands/speckit.test.md` adds a testing step that discovers and runs the project test suite after implementation.
 - `spec-kit/presets/orchestrator-workflow/commands/speckit.implement.md` turns implementation into a stricter coordination step that requires analysis, uses a feature branch, and sequences backend before UI.
-- `spec-kit/workflows/orchestrator-design-first.yml` defines the full Strategist-led SDD cycle: constitution → specify → design → plan → tasks → analyze → implement → test → review → merge-readiness.
+- `spec-kit/workflows/orchestrator-design-first.yml` defines the full Strategist-led SDD cycle: discover → brief → constitution → specify → design → plan → tasks → analyze → implement → test → review → merge-readiness.
 
 ## Port Forwarding Policy
 

@@ -37,6 +37,7 @@ load_asset_manifest() {
       .github/agents
       .github/instructions
       .github/copilot-instructions.md
+      docs/errors
     )
   fi
   printf '%s\n' "${result[@]}"
@@ -48,6 +49,7 @@ assets=(
   .github/agents
   .github/instructions
   .github/copilot-instructions.md
+  docs/errors
 )
 
 cleanup() {
@@ -76,8 +78,12 @@ Project commands:
   new <name>         Scaffold a new project with dev-env assets
   test               Detect stack and run the appropriate test suite
   audit              Run dependency audits and security checks
-  release            Bump version, tag, and prepare a release
+  release            Prepare or publish a gated release
   verify feature     Pre-merge checklist for the current feature branch
+
+Feature commands:
+  feature            One-screen status for the active Speckit feature
+  explain <stage>    Plain-language description of a Speckit workflow stage
 
 Other:
   completion         Emit bash completion script
@@ -92,8 +98,11 @@ Common examples:
   kite doctor .
   kite test .
   kite audit .
-  kite release --bump minor --confirm .
+  kite release prepare --bump minor .
+  kite release publish --bump minor --confirm .
   kite verify feature .
+  kite feature
+  kite explain plan
 EOF
 }
 
@@ -124,7 +133,9 @@ update_workspace_help() {
 Usage:
   kite update workspace [options] [target-directory]
 
-Refresh the copied .devcontainer and .github workspace assets in a target repo.
+Refresh the copied workspace assets and support docs in a target repo.
+If .kite/config.yml is missing, the source default is seeded. Existing
+.kite/config.yml files are preserved.
 
 Update modes:
   Default behavior replaces workspace assets from source (destructive for local edits).
@@ -251,7 +262,10 @@ Usage:
 Scaffold a new project with dev-env assets.
 
 Options:
-  --template TYPE      Devcontainer profile to use (default: base)
+  --template TYPE      Devcontainer profile: base, python, typescript, fullstack
+  --license ID         License choice to record in .kite/config.yml (default: MIT)
+  --deploy-target T    Deploy target to record in .kite/config.yml (default: none)
+  --test-tier T        Default test tier to record in .kite/config.yml (default: standard)
   --with-speckit       Also bootstrap the bundled Spec Kit setup
   --speckit-version V  Pin the Spec Kit CLI version
   --git-init-commit    Create an initial git commit after scaffolding
@@ -260,35 +274,50 @@ Options:
   --source-dir PATH    Use a local dev-env checkout
   -h, --help           Show this help text
 
+Behavior:
+  In interactive terminals, missing choice flags open guided pickers.
+  Selected choices are written to .kite/config.yml for later review.
+
 Examples:
   kite new my-app
-  kite new my-app --template base --with-speckit
+  kite new my-app --template fullstack --license Apache-2.0 --deploy-target flyio --with-speckit
   kite new my-app --git-init-commit
 EOF
 }
 
 release_help() {
-  cat <<EOF
+  cat <<'EOF'
 Usage:
+  kite release prepare [options] [target-directory]
+  kite release publish [options] [target-directory]
   kite release [options] [target-directory]
 
-Bump version, tag, and prepare a release.
+Prepare a release on a feature branch, then publish it from the default branch.
+Without a subcommand, `kite release` is a legacy alias for `kite release publish`.
 
-Options:
+Prepare options:
   --bump TYPE          Version bump type: major, minor, patch (default: patch)
-  --confirm            Actually apply the release (default is dry-run preview)
-  --skip-checks        Skip pre-release test and audit gates
-  --dry-run            Preview changes without writing (legacy; same as omitting --confirm)
+  --skip-checks        Skip `kite verify feature`, `kite test`, and `kite audit`
+  --dry-run            Preview only (default behavior for prepare)
+
+Publish options:
+  --bump TYPE          Version bump type: major, minor, patch (default: patch)
+  --confirm            Actually write version, changelog, commit, and tag
+  --skip-checks        Skip publish-time test and audit gates
+  --dry-run            Preview changes without writing (default when --confirm is omitted)
   -h, --help           Show this help text
 
 Safety:
-  Without --confirm, release shows a preview and exits.
-  With --confirm, runs test + audit before mutating (use --skip-checks to bypass).
+  `prepare` runs merge-readiness plus test and audit on the feature branch.
+  `publish` runs test and audit again on the default branch before mutating.
+  Release notes combine merged PR titles (when available) with the
+  `[Unreleased]` changelog section.
 
 Examples:
-  kite release .
-  kite release --bump minor --confirm .
-  kite release --bump major --confirm --skip-checks .
+  kite release prepare .
+  kite release prepare --bump minor .
+  kite release publish --bump minor --confirm .
+  kite release publish --bump major --confirm --skip-checks .
 EOF
 }
 
@@ -305,8 +334,71 @@ Checks:
   - No merge conflicts in tracked files
   - Active Speckit tasks file has all tasks marked done
 
+Recovery:
+  On failure, kite prints why the check matters, concrete next commands,
+  and the matching docs/errors page.
+
 Examples:
   kite verify feature .
+EOF
+}
+
+feature_help() {
+  cat <<EOF
+Usage:
+  kite feature [target-directory] [--json]
+
+One-screen status view for the active Speckit feature.
+
+Shows:
+  - Feature name, branch, and current lifecycle stage
+  - Checklist of canonical artifacts (done vs pending)
+  - Last 3 artifacts changed (by modification time)
+  - Single recommended next action
+
+The active feature is detected from .specify/feature.json, the current
+git branch, or a sole directory under specs/.
+
+Options:
+  --json             Emit machine-readable JSON for tooling
+
+Examples:
+  kite feature
+  kite feature --json
+EOF
+}
+
+explain_help() {
+  cat <<EOF
+Usage:
+  kite explain <stage>
+
+Plain-language description of a Speckit workflow stage.
+
+Designed for non-technical users and junior engineers. Each stage
+shows: what happens, who runs it, what artifact it produces, and
+what to do next.
+
+Stages:
+  discover     Idea and audience exploration (Strategist)
+  brief        Durable feature brief handoff
+  constitution Project standards and non-negotiables
+  specify      Requirements and acceptance criteria
+  design       Visual direction and design system
+  plan         Technical plan and architecture
+  tasks        Task breakdown with IDs
+  analyze      Consistency and coverage analysis
+  implement    Backend + UI implementation
+  test         Automated and manual verification
+  review       Code review synthesis
+  verify       Pre-merge checklist (kite verify feature)
+  release      Version bump, tag, deploy
+  operate      Monitoring, logging, alerts
+  learn        Post-release feedback capture
+
+Examples:
+  kite explain specify
+  kite explain plan
 EOF
 }
 
@@ -339,6 +431,12 @@ show_help() {
       ;;
     "verify-feature")
       verify_feature_help
+      ;;
+    "feature")
+      feature_help
+      ;;
+    "explain")
+      explain_help
       ;;
     *)
       general_help
@@ -446,6 +544,8 @@ has_speckit_bootstrap() {
   local required_file
   local required_files=(
     .specify/presets/orchestrator-workflow/preset.yml
+    .specify/presets/orchestrator-workflow/commands/speckit.discover.md
+    .specify/presets/orchestrator-workflow/commands/speckit.brief.md
     .specify/presets/orchestrator-workflow/commands/speckit.constitution.md
     .specify/presets/orchestrator-workflow/commands/speckit.design.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.md
@@ -572,6 +672,143 @@ default_branch_name() {
     branch="main"
   fi
   printf '%s\n' "$branch"
+}
+
+is_interactive_terminal() {
+  [[ -t 0 && -t 1 ]]
+}
+
+validate_choice() {
+  local field="$1"
+  local value="$2"
+  shift 2
+
+  local allowed
+  for allowed in "$@"; do
+    if [[ "$value" == "$allowed" ]]; then
+      return 0
+    fi
+  done
+
+  echo "Unsupported $field: $value" >&2
+  echo "Allowed values: $*" >&2
+  return 1
+}
+
+prompt_choice() {
+  local result_var="$1"
+  local prompt="$2"
+  local default_value="$3"
+  shift 3
+
+  local -a options=("$@")
+  local option_count="${#options[@]}"
+  local default_index=1
+  local idx=1
+  local option_spec value label description answer
+
+  if ! is_interactive_terminal; then
+    printf -v "$result_var" '%s' "$default_value"
+    return 0
+  fi
+
+  echo "$prompt"
+  for option_spec in "${options[@]}"; do
+    IFS='|' read -r value label description <<< "$option_spec"
+    if [[ "$value" == "$default_value" ]]; then
+      default_index=$idx
+    fi
+    printf '  %d) %s' "$idx" "$label"
+    if [[ -n "$description" ]]; then
+      printf ' - %s' "$description"
+    fi
+    if [[ "$value" == "$default_value" ]]; then
+      printf ' [recommended]'
+    fi
+    printf '\n'
+    idx=$((idx + 1))
+  done
+
+  while true; do
+    printf 'Choose 1-%d [%d]: ' "$option_count" "$default_index"
+    IFS= read -r answer || answer=""
+    if [[ -z "$answer" ]]; then
+      answer="$default_index"
+    fi
+    if [[ "$answer" =~ ^[0-9]+$ ]] && (( answer >= 1 && answer <= option_count )); then
+      IFS='|' read -r value _ <<< "${options[$((answer - 1))]}"
+      printf -v "$result_var" '%s' "$value"
+      echo ""
+      return 0
+    fi
+    echo "Enter a number between 1 and $option_count."
+  done
+}
+
+write_kite_config() {
+  local target="$1"
+  local template="$2"
+  local license="$3"
+  local deploy_target="$4"
+  local test_tier="$5"
+
+  mkdir -p "$target/.kite"
+  cat > "$target/.kite/config.yml" <<EOF
+# Repo-local defaults for the kite workflow.
+schema_version: 1
+
+scaffold:
+  template: $template
+  license: $license
+
+workflow:
+  test_tier: $test_tier
+
+deploy:
+  target: $deploy_target
+EOF
+}
+
+suggest_feature_branch_name() {
+  local feature_dir feature_name="my-feature"
+  feature_dir="$(get_active_feature_dir "$target_dir" 2>/dev/null || true)"
+  if [[ -n "$feature_dir" ]]; then
+    feature_name="$(basename "$feature_dir")"
+  fi
+  feature_name="$(printf '%s' "$feature_name" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '-')"
+  feature_name="${feature_name#-}"
+  feature_name="${feature_name%-}"
+  if [[ -z "$feature_name" ]]; then
+    feature_name="my-feature"
+  fi
+  printf 'feat/%s\n' "$feature_name"
+}
+
+error_doc_path() {
+  local doc_name="$1"
+  local doc_path="$target_dir/docs/errors/$doc_name"
+  if [[ "$target_dir" == "$PWD" ]]; then
+    doc_path="docs/errors/$doc_name"
+  fi
+  printf '%s\n' "$doc_path"
+}
+
+print_recovery_block() {
+  local explanation="$1"
+  local doc_path="$2"
+  shift 2
+
+  echo "       Why: $explanation"
+  if [[ $# -gt 0 ]]; then
+    echo "       Try next:"
+    local step
+    for step in "$@"; do
+      echo "         $step"
+    done
+  fi
+  if [[ -n "$doc_path" ]]; then
+    echo "       Learn more: $doc_path"
+  fi
 }
 
 detect_stack() {
@@ -859,10 +1096,18 @@ find_active_tasks_file() {
 
 run_verify_feature() {
   local issues=0
+  local feature_branch_suggestion
+
+  feature_branch_suggestion="$(suggest_feature_branch_name)"
   echo "Verify-feature target: $target_dir"
 
   if ! command -v git >/dev/null 2>&1 || ! git -C "$target_dir" rev-parse --git-dir >/dev/null 2>&1; then
     echo "[warn] Not a git repository"
+    print_recovery_block \
+      "kite verify feature needs a git repository so it can inspect branch state, conflicts, and tracked task progress." \
+      "$(error_doc_path "verify-feature-not-a-git-repo.md")" \
+      "$(shell_join git init)" \
+      "$(shell_join git checkout -b "$feature_branch_suggestion")"
     return 1
   fi
 
@@ -873,9 +1118,17 @@ run_verify_feature() {
 
   if [[ -z "$current_branch" ]]; then
     echo "[warn] Could not determine current branch"
+    print_recovery_block \
+      "Detached HEAD or a missing branch ref leaves kite without a feature branch to verify." \
+      "$(error_doc_path "verify-feature-unknown-branch.md")" \
+      "$(shell_join git checkout -b "$feature_branch_suggestion")"
     issues=1
   elif [[ "$current_branch" == "$default_branch" ]]; then
     echo "[warn] Currently on $default_branch; switch to a feature branch first"
+    print_recovery_block \
+      "Pre-merge verification belongs on a feature branch so $default_branch stays the merge target instead of the work branch." \
+      "$(error_doc_path "verify-feature-default-branch.md")" \
+      "$(shell_join git checkout -b "$feature_branch_suggestion")"
     issues=1
   else
     echo "[ok] active feature branch: $current_branch"
@@ -883,6 +1136,11 @@ run_verify_feature() {
 
   if [[ -n "$(git -C "$target_dir" status --porcelain)" ]]; then
     echo "[warn] Working tree has uncommitted changes"
+    print_recovery_block \
+      "Uncommitted work makes merge-readiness ambiguous; checkpoint or stash it before running the gate." \
+      "$(error_doc_path "verify-feature-dirty-tree.md")" \
+      "$(shell_join git status --short)" \
+      "$(shell_join git stash push -u -m "pre-verify cleanup")"
     issues=1
   else
     echo "[ok] Working tree is clean"
@@ -898,6 +1156,11 @@ run_verify_feature() {
   if [[ -n "$conflict_files" ]]; then
     echo "[warn] Merge conflict markers found:"
     printf '%s' "$conflict_files"
+    print_recovery_block \
+      "Conflict markers mean the branch is not in a reviewable state yet; resolve and re-stage the files first." \
+      "$(error_doc_path "verify-feature-merge-conflicts.md")" \
+      "$(shell_join git diff --name-only --diff-filter=U)" \
+      "$(shell_join git add "<resolved-files>")"
     issues=1
   else
     echo "[ok] No merge conflict markers"
@@ -911,7 +1174,18 @@ run_verify_feature() {
     local incomplete
     incomplete="$(grep -cE '^\s*-\s*\[ \]' "$tasks_file" 2>/dev/null || true)"
     if [[ "$incomplete" -gt 0 ]]; then
+      local rel_tasks task_lookup_path
+      rel_tasks="${tasks_file#"$target_dir/"}"
+      task_lookup_path="$tasks_file"
+      if [[ "$rel_tasks" != "$tasks_file" ]]; then
+        task_lookup_path="$rel_tasks"
+      fi
       echo "[warn] $incomplete incomplete task(s) in $tasks_file"
+      print_recovery_block \
+        "The active tasks file still shows open work, so merge review would skip declared scope or verification steps." \
+        "$(error_doc_path "verify-feature-incomplete-tasks.md")" \
+        "$(shell_join grep -nE '^\s*-\s*\[ \]' "$task_lookup_path")" \
+        "$(build_kite_command feature)"
       issues=1
     else
       local rel_tasks="${tasks_file#"$target_dir/"}"
@@ -930,17 +1204,545 @@ run_verify_feature() {
   return 1
 }
 
+# Compute the most recent modification time (unix epoch) of a file.
+_file_mtime() {
+  local file="$1"
+  [[ -f "$file" ]] || { echo 0; return; }
+  stat -c '%Y' "$file" 2>/dev/null || stat -f '%m' "$file" 2>/dev/null || echo 0
+}
+
+# Format a unix epoch as a relative-time string (e.g. "3h ago").
+_relative_time() {
+  local epoch="$1"
+  [[ "$epoch" =~ ^[0-9]+$ ]] || { echo "unknown"; return; }
+  [[ "$epoch" -eq 0 ]] && { echo "never"; return; }
+  local now delta
+  now="$(date +%s)"
+  delta=$((now - epoch))
+  if (( delta < 60 )); then echo "just now"
+  elif (( delta < 3600 )); then echo "$((delta/60))m ago"
+  elif (( delta < 86400 )); then echo "$((delta/3600))h ago"
+  elif (( delta < 604800 )); then echo "$((delta/86400))d ago"
+  else echo "$((delta/604800))w ago"
+  fi
+}
+
+run_feature_status() {
+  local as_json="${1:-0}"
+  local feature_dir feature_name branch=""
+  local -a artifact_paths=() artifact_labels=()
+  local -a present_labels=() pending_labels=() recent_lines=()
+  local current_stage="unknown" next_action="" next_command=""
+
+  feature_dir="$(get_active_feature_dir "$target_dir" 2>/dev/null || true)"
+
+  if command -v git >/dev/null 2>&1 && git -C "$target_dir" rev-parse --git-dir >/dev/null 2>&1; then
+    branch="$(git -C "$target_dir" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$feature_dir" ]]; then
+    if [[ "$as_json" -eq 1 ]]; then
+      printf '{"status":"no-active-feature","branch":%s,"hint":%s}\n' \
+        "$(json_escape "$branch")" \
+        "$(json_escape "Run kite install speckit . then /speckit.discover \"your feature idea\" to start a feature")"
+    else
+      echo "No active Speckit feature detected."
+      echo ""
+      echo "Hints:"
+      echo "  - Current branch: ${branch:-<none>}"
+      echo "  - Run: kite install speckit ."
+      echo "  - Then: /speckit.discover \"your feature idea\""
+    fi
+    return 0
+  fi
+
+  feature_name="$(basename "$feature_dir")"
+
+  # Canonical artifact checklist (stage -> path label).
+  # Order matters: it drives the "current stage" detection.
+  artifact_labels=(
+    "discover"
+    "brief"
+    "constitution"
+    "specify"
+    "design"
+    "plan"
+    "tasks"
+    "analyze"
+    "test"
+    "review"
+    "release"
+    "operate"
+    "learn"
+  )
+  artifact_paths=(
+    "$feature_dir/discovery.md"
+    "$feature_dir/brief.md"
+    "$target_dir/.specify/memory/constitution.md"
+    "$feature_dir/spec.md"
+    "$target_dir/.specify/memory/design-direction.md"
+    "$feature_dir/plan.md"
+    "$feature_dir/tasks.md"
+    "$feature_dir/analyze.md"
+    "$feature_dir/test-results.md"
+    "$feature_dir/review.md"
+    "$feature_dir/release.md"
+    "$feature_dir/operate.md"
+    "$feature_dir/learn.md"
+  )
+
+  # Walk in order; last present artifact defines the current stage.
+  local i count=${#artifact_labels[@]}
+  for (( i=0; i<count; i++ )); do
+    local label="${artifact_labels[$i]}"
+    local path="${artifact_paths[$i]}"
+    if [[ -f "$path" ]]; then
+      present_labels+=("$label")
+      current_stage="$label"
+    else
+      pending_labels+=("$label")
+    fi
+  done
+
+  # Pick next action from the first pending artifact.
+  if (( ${#pending_labels[@]} > 0 )); then
+    case "${pending_labels[0]}" in
+      discover)     next_action="Capture discovery for the feature"; next_command="/speckit.discover" ;;
+      brief)        next_action="Draft a feature brief";          next_command="/speckit.brief" ;;
+      constitution) next_action="Lock project standards";          next_command="/speckit.constitution" ;;
+      specify)      next_action="Write the feature spec";          next_command="/speckit.specify" ;;
+      design)       next_action="Define design direction";         next_command="Designer agent or /speckit.design" ;;
+      plan)         next_action="Produce the technical plan";      next_command="/speckit.plan" ;;
+      tasks)        next_action="Break work into tasks";           next_command="/speckit.tasks" ;;
+      analyze)      next_action="Run consistency analysis";        next_command="/speckit.analyze" ;;
+      test)         next_action="Run and capture test results";    next_command="/speckit.test" ;;
+      review)       next_action="Synthesize the code review";      next_command="Code Reviewer agent" ;;
+      release)      next_action="Prepare the release";             next_command="kite release prepare --bump <level> ." ;;
+      operate)      next_action="Capture monitoring & alerts";     next_command="DevOps agent (operate stage)" ;;
+      learn)        next_action="Record post-release learnings";   next_command="Orchestrator (learn stage)" ;;
+    esac
+  else
+    next_action="All canonical artifacts present"
+    next_command="kite verify feature ."
+  fi
+
+  # Build "recent artifacts" list sorted by mtime desc.
+  local -a mtime_rows=()
+  for (( i=0; i<count; i++ )); do
+    local path="${artifact_paths[$i]}"
+    [[ -f "$path" ]] || continue
+    local mt rel
+    mt="$(_file_mtime "$path")"
+    rel="${path#"$target_dir/"}"
+    mtime_rows+=("${mt}|${artifact_labels[$i]}|${rel}")
+  done
+
+  local -a sorted_rows=()
+  if (( ${#mtime_rows[@]} > 0 )); then
+    while IFS= read -r line; do
+      sorted_rows+=("$line")
+    done < <(printf '%s\n' "${mtime_rows[@]}" | sort -t '|' -k1,1nr)
+  fi
+
+  local max=3 shown=0 line
+  for line in "${sorted_rows[@]:-}"; do
+    [[ -z "$line" ]] && continue
+    (( shown >= max )) && break
+    local mt rest label rel
+    mt="${line%%|*}"
+    rest="${line#*|}"
+    label="${rest%%|*}"
+    rel="${rest#*|}"
+    recent_lines+=("$(printf '%-12s %s (%s)' "$label" "$rel" "$(_relative_time "$mt")")")
+    shown=$((shown + 1))
+  done
+
+  if [[ "$as_json" -eq 1 ]]; then
+    # Build JSON arrays via json_array helper.
+    local present_json pending_json
+    present_json="$(json_array "${present_labels[@]+"${present_labels[@]}"}")"
+    pending_json="$(json_array "${pending_labels[@]+"${pending_labels[@]}"}")"
+    local recent_json="[" first=1 r
+    for r in "${recent_lines[@]:-}"; do
+      [[ -z "$r" ]] && continue
+      if [[ $first -eq 1 ]]; then first=0; else recent_json+=","; fi
+      recent_json+="$(json_escape "$r")"
+    done
+    recent_json+="]"
+
+    printf '{"status":"active","feature":%s,"feature_dir":%s,"branch":%s,"current_stage":%s,"present":%s,"pending":%s,"recent":%s,"next_action":%s,"next_command":%s}\n' \
+      "$(json_escape "$feature_name")" \
+      "$(json_escape "${feature_dir#"$target_dir/"}")" \
+      "$(json_escape "$branch")" \
+      "$(json_escape "$current_stage")" \
+      "$present_json" \
+      "$pending_json" \
+      "$recent_json" \
+      "$(json_escape "$next_action")" \
+      "$(json_escape "$next_command")"
+    return 0
+  fi
+
+  echo "Feature:  $feature_name"
+  echo "Branch:   ${branch:-<none>}"
+  echo "Stage:    $current_stage"
+  echo ""
+  echo "Artifacts:"
+  for (( i=0; i<count; i++ )); do
+    local label="${artifact_labels[$i]}"
+    local path="${artifact_paths[$i]}"
+    if [[ -f "$path" ]]; then
+      printf '  [x] %-12s %s\n' "$label" "${path#"$target_dir/"}"
+    else
+      printf '  [ ] %-12s %s\n' "$label" "${path#"$target_dir/"}"
+    fi
+  done
+
+  if (( ${#recent_lines[@]} > 0 )); then
+    echo ""
+    echo "Recently changed:"
+    local rline
+    for rline in "${recent_lines[@]}"; do
+      echo "  $rline"
+    done
+  fi
+
+  echo ""
+  echo "Next action: $next_action"
+  if [[ -n "$next_command" ]]; then
+    echo "Run:         $next_command"
+  fi
+}
+
+run_explain() {
+  local stage="${1:-}"
+  if [[ -z "$stage" || "$stage" == "-h" || "$stage" == "--help" ]]; then
+    show_help "explain"
+    return 0
+  fi
+
+  case "$stage" in
+    discover)
+      cat <<'EOF'
+Stage: discover
+
+What it is:
+  A canonical discovery pass that turns an idea into a concrete problem,
+  user, outcome, and success signal before technical specification starts.
+
+Who runs it:
+  /speckit.discover after Strategist has pressure-tested the direction.
+  Marketer is optional when audience or market-fit confidence is still weak.
+
+What comes out:
+  specs/<feature>/discovery.md and, when needed,
+  specs/<feature>/market-validation.md.
+
+Next:
+  /speckit.brief — turns the approved discovery artifact into a
+  stakeholder-friendly product brief.
+EOF
+      ;;
+    brief)
+      cat <<'EOF'
+Stage: brief
+
+What it is:
+  A plain-language product brief that stakeholders can read and approve
+  before technical specification starts.
+
+Who writes it:
+  /speckit.brief using the approved discovery artifact.
+
+What comes out:
+  specs/<feature>/brief.md with problem, user, value, scope,
+  success metric, and non-goals.
+
+Next:
+  /speckit.constitution, then /speckit.specify.
+EOF
+      ;;
+    constitution)
+      cat <<'EOF'
+Stage: constitution
+
+What it is:
+  Project-wide standards and non-negotiables: coding style, testing bar,
+  accessibility, performance budgets, security posture.
+
+Who runs it:
+  /speckit.constitution command.
+
+What comes out:
+  .specify/memory/constitution.md — read by every later stage.
+
+Next:
+  /speckit.specify once the constitution is approved.
+EOF
+      ;;
+    specify)
+      cat <<'EOF'
+Stage: specify
+
+What it is:
+  Formal feature spec: user stories, functional requirements (FR IDs),
+  acceptance criteria, and scope boundaries.
+
+Who runs it:
+  /speckit.specify command. Ask clarification questions before writing.
+
+What comes out:
+  specs/<feature>/spec.md — the source of truth for what must be built.
+
+Next:
+  Designer agent or /speckit.design for UI features, then /speckit.plan.
+EOF
+      ;;
+    design)
+      cat <<'EOF'
+Stage: design
+
+What it is:
+  Visual direction, design system, color, typography, spacing, component
+  principles. Only needed for features with UI surface.
+
+Who runs it:
+  Designer agent (interactive) or /speckit.design.
+
+What comes out:
+  .specify/memory/design-direction.md — read by UI Builder during build.
+
+Next:
+  /speckit.plan — technical plan that references the design direction.
+EOF
+      ;;
+    plan)
+      cat <<'EOF'
+Stage: plan
+
+What it is:
+  Technical plan: architecture, data model, APIs, tech choices, risks.
+
+Who runs it:
+  /speckit.plan command.
+
+What comes out:
+  specs/<feature>/plan.md.
+
+Next:
+  /speckit.tasks — break the plan into a checklist of concrete tasks.
+EOF
+      ;;
+    tasks)
+      cat <<'EOF'
+Stage: tasks
+
+What it is:
+  Ordered checklist of implementation tasks, each with an ID and mapped
+  to FR IDs from the spec.
+
+Who runs it:
+  /speckit.tasks command.
+
+What comes out:
+  specs/<feature>/tasks.md.
+
+Next:
+  /speckit.analyze to check consistency, then Backend Dev / UI Builder to
+  execute tasks.
+EOF
+      ;;
+    analyze)
+      cat <<'EOF'
+Stage: analyze
+
+What it is:
+  Consistency and coverage check across spec, plan, and tasks. Catches
+  missing requirements and orphan tasks before coding starts.
+
+Who runs it:
+  /speckit.analyze command.
+
+What comes out:
+  A report (stored under specs/<feature>/ or in chat) with issues to fix.
+
+Next:
+  Fix any gaps, then begin implementation.
+EOF
+      ;;
+    implement)
+      cat <<'EOF'
+Stage: implement
+
+What it is:
+  Writing the code for the tasks in specs/<feature>/tasks.md.
+
+Who runs it:
+  Backend Dev agent (APIs, jobs, data) and UI Builder agent (frontend).
+  Both reference the spec, plan, design direction, and tasks.
+
+What comes out:
+  Working code on the feature branch, with task checkboxes ticked.
+
+Next:
+  /speckit.test to verify.
+EOF
+      ;;
+    test)
+      cat <<'EOF'
+Stage: test
+
+What it is:
+  Automated and manual verification: unit tests, integration tests, and
+  spot-checks against acceptance criteria.
+
+Who runs it:
+  /speckit.test command, then kite test for the stack's native runner.
+
+What comes out:
+  Passing test suite and a short summary (optionally under
+  specs/<feature>/test-results.md).
+
+Next:
+  Code Reviewer agent for a review pass.
+EOF
+      ;;
+    review)
+      cat <<'EOF'
+Stage: review
+
+What it is:
+  Multi-perspective code review: correctness, security, performance,
+  clarity. Outputs a prioritized action list.
+
+Who runs it:
+  Code Reviewer agent.
+
+What comes out:
+  A review summary and any fix commits.
+
+Next:
+  kite verify feature to confirm merge-readiness.
+EOF
+      ;;
+    verify)
+      cat <<'EOF'
+Stage: verify
+
+What it is:
+  Pre-merge checklist: clean working tree, on a feature branch, no merge
+  conflicts, tasks complete.
+
+Who runs it:
+  kite verify feature .
+
+What comes out:
+  "Verification status: ready for merge review" or a list of items to fix.
+
+Next:
+  Open a pull request; after merge, proceed to release.
+EOF
+      ;;
+    release)
+      cat <<'EOF'
+Stage: release
+
+What it is:
+  A two-step release flow: `prepare` proves the feature branch is ready,
+  then `publish` bumps the version, updates the changelog, and tags the
+  default branch.
+
+Who runs it:
+  kite release prepare --bump <patch|minor|major> .
+  After merge: kite release publish --bump <patch|minor|major> --confirm .
+
+What comes out:
+  A release preview with gates and notes, then a tagged commit and
+  updated CHANGELOG.md on publish.
+
+Next:
+  Operate — watch the release in production.
+EOF
+      ;;
+    operate)
+      cat <<'EOF'
+Stage: operate
+
+What it is:
+  Monitoring, logging, alerts, and incident response for the shipped
+  feature.
+
+Who runs it:
+  DevOps agent; results captured in specs/<feature>/operate.md.
+
+What comes out:
+  Dashboards, alert rules, and a runbook snippet for on-call.
+
+Next:
+  Learn — capture feedback and feed it back into discovery.
+EOF
+      ;;
+    learn)
+      cat <<'EOF'
+Stage: learn
+
+What it is:
+  Post-release reflection: what users did, what broke, what to build
+  next.
+
+Who runs it:
+  Orchestrator (loops back to Strategist / Marketer as needed).
+
+What comes out:
+  specs/<feature>/learn.md with metrics, quotes, and next-bet ideas.
+
+Next:
+  A new discover loop for the follow-up feature.
+EOF
+      ;;
+    *)
+      echo "Unknown stage: $stage" >&2
+      echo "" >&2
+      show_help "explain" >&2
+      return 1
+      ;;
+  esac
+}
+
 run_new() {
   local git_init_commit=0
   local project_dir
   local project_name=""
   local template="base"
+  local license="MIT"
+  local deploy_target="none"
+  local test_tier="standard"
   local new_with_speckit=0
+  local template_set=0
+  local license_set=0
+  local deploy_target_set=0
+  local test_tier_set=0
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --template)
         template="${2:?Missing value for --template}"
+        template_set=1
+        shift 2
+        ;;
+      --license)
+        license="${2:?Missing value for --license}"
+        license_set=1
+        shift 2
+        ;;
+      --deploy-target)
+        deploy_target="${2:?Missing value for --deploy-target}"
+        deploy_target_set=1
+        shift 2
+        ;;
+      --test-tier)
+        test_tier="${2:?Missing value for --test-tier}"
+        test_tier_set=1
         shift 2
         ;;
       --with-speckit)
@@ -996,6 +1798,44 @@ run_new() {
     return 1
   fi
 
+  if [[ $template_set -ne 1 ]]; then
+    prompt_choice template "Choose a devcontainer profile:" "$template" \
+      "base|Base|Minimal workspace shell and repo tooling" \
+      "python|Python|Python-first tooling and runtime" \
+      "typescript|TypeScript|Node.js and TypeScript focused tooling" \
+      "fullstack|Fullstack|Python plus TypeScript in one container"
+  fi
+
+  if [[ $license_set -ne 1 ]]; then
+    prompt_choice license "Choose the default project license to record:" "$license" \
+      "MIT|MIT|Permissive default for most starter projects" \
+      "Apache-2.0|Apache-2.0|Permissive with explicit patent grant" \
+      "GPL-3.0-only|GPL-3.0-only|Strong copyleft for shared derivatives" \
+      "UNLICENSED|UNLICENSED|Private repo default with no public license grant"
+  fi
+
+  if [[ $deploy_target_set -ne 1 ]]; then
+    prompt_choice deploy_target "Choose the default deploy target to record:" "$deploy_target" \
+      "none|None|Decide later without committing to a platform" \
+      "flyio|Fly.io|Good default for small fullstack apps" \
+      "railway|Railway|Managed deploy flow with low setup overhead" \
+      "render|Render|Simple managed services and static sites" \
+      "vercel|Vercel|Frontend-heavy deployments and edge routing" \
+      "aws|AWS|Most flexible option with the highest setup cost"
+  fi
+
+  if [[ $test_tier_set -ne 1 ]]; then
+    prompt_choice test_tier "Choose the default verification tier to record:" "$test_tier" \
+      "smoke|Smoke|Fast confidence checks before bigger changes" \
+      "standard|Standard|Balanced default for day-to-day feature work" \
+      "full|Full|Heavier verification before release or risky refactors"
+  fi
+
+  validate_choice "template" "$template" base python typescript fullstack || return 1
+  validate_choice "license" "$license" MIT Apache-2.0 GPL-3.0-only UNLICENSED || return 1
+  validate_choice "deploy target" "$deploy_target" none flyio railway render vercel aws || return 1
+  validate_choice "test tier" "$test_tier" smoke standard full || return 1
+
   echo "Scaffolding $project_name..."
   mkdir -p "$project_dir"
   git -C "$project_dir" init --quiet
@@ -1046,6 +1886,8 @@ HEREDOC
     bash "$project_dir/.devcontainer/switch-profile.sh" "$template"
   fi
 
+  write_kite_config "$project_dir" "$template" "$license" "$deploy_target" "$test_tier"
+
   if [[ $git_init_commit -eq 1 ]]; then
     git -C "$project_dir" add .
     git -C "$project_dir" -c user.name='kite' -c user.email='kite@dev-env' commit -m 'chore: scaffold project with dev-env' --allow-empty >/dev/null
@@ -1053,6 +1895,7 @@ HEREDOC
 
   echo ""
   echo "Project scaffolded at $project_dir"
+  echo "Saved workflow defaults to $project_dir/.kite/config.yml"
   echo ""
   echo "Next steps:"
   echo "  cd $project_name"
@@ -1105,143 +1948,469 @@ bump_version() {
   printf '%s %s %s\n' "$version_file" "$current_version" "$new_version"
 }
 
-run_release() {
-  local bump_type="patch" release_dry_run=0 confirm=0 skip_checks=0
-  local version_info version_file current_version new_version tag_name
+  validate_release_bump_type() {
+    local bump_type="$1"
 
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --bump)
-        bump_type="${2:?Missing value for --bump}"
-        shift 2
+    case "$bump_type" in
+      major|minor|patch) return 0 ;;
+      *)
+        echo "Unknown bump type: $bump_type (expected: major, minor, patch)" >&2
+        return 1
         ;;
-      --dry-run)
-        release_dry_run=1
-        shift
-        ;;
-      --confirm)
-        confirm=1
-        shift
-        ;;
-      --skip-checks)
-        skip_checks=1
-        shift
-        ;;
-      *) break ;;
     esac
-  done
+  }
 
-  case "$bump_type" in
-    major|minor|patch) ;;
-    *)
-      echo "Unknown bump type: $bump_type (expected: major, minor, patch)" >&2
-      return 1
-      ;;
-  esac
+  latest_release_tag() {
+    local target="$1"
+    git -C "$target" describe --tags --abbrev=0 2>/dev/null || true
+  }
 
-  echo "Release target: $target_dir"
+  github_repo_slug() {
+    local target="$1"
+    local remote_url slug=""
 
-  if ! command -v git >/dev/null 2>&1 || ! git -C "$target_dir" rev-parse --git-dir >/dev/null 2>&1; then
-    echo "[warn] Not a git repository"
-    return 1
-  fi
+    remote_url="$(git -C "$target" remote get-url origin 2>/dev/null || true)"
 
-  local current_branch
-  current_branch="$(git -C "$target_dir" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  local default_branch
-  default_branch="$(default_branch_name "$target_dir")"
+    case "$remote_url" in
+      git@github.com:*) slug="${remote_url#git@github.com:}" ;;
+      ssh://git@github.com/*) slug="${remote_url#ssh://git@github.com/}" ;;
+      https://github.com/*) slug="${remote_url#https://github.com/}" ;;
+    esac
 
-  if [[ "$current_branch" != "$default_branch" ]]; then
-    echo "[warn] Releases should be cut from $default_branch (currently on $current_branch)"
-    return 1
-  fi
-
-  if [[ -n "$(git -C "$target_dir" status --porcelain)" ]]; then
-    echo "[warn] Working tree is not clean; commit changes first"
-    return 1
-  fi
-
-  version_info="$(bump_version "$bump_type")"
-  if [[ -z "$version_info" ]]; then
-    return 1
-  fi
-
-  read -r version_file current_version new_version _ <<< "$version_info"
-  tag_name="v$new_version"
-
-  echo "Version source: $version_file"
-  echo "Current version: $current_version"
-  echo "New version: $new_version ($bump_type bump)"
-  echo "Tag: $tag_name"
-
-  if [[ $release_dry_run -eq 1 ]]; then
-    echo ""
-    echo "Dry run - no changes written"
-    return 0
-  fi
-
-  if [[ $confirm -ne 1 ]]; then
-    echo ""
-    echo "Dry run (default). To apply this release, re-run with --confirm."
-    return 0
-  fi
-
-  if [[ $skip_checks -ne 1 ]]; then
-    echo ""
-    echo "Running pre-release checks..."
-    if ! run_test; then
-      echo ""
-      echo "[error] Tests failed. Fix before releasing, or use --skip-checks to bypass."
-      return 1
+    slug="${slug%.git}"
+    if [[ "$slug" == */* ]]; then
+      printf '%s\n' "$slug"
+      return 0
     fi
-    if ! run_audit; then
-      echo ""
-      echo "[warn] Audit has findings. Review before releasing, or use --skip-checks to bypass."
-      return 1
+
+    return 1
+  }
+
+  collect_release_pr_titles_via_gh() {
+    local target="$1"
+    local default_branch="$2"
+    local since_date="$3"
+    local repo_slug pr_lines=""
+
+    command -v gh >/dev/null 2>&1 || return 1
+
+    repo_slug="$(github_repo_slug "$target" 2>/dev/null || true)"
+    [[ -n "$repo_slug" ]] || return 1
+
+    pr_lines="$(gh pr list \
+      --repo "$repo_slug" \
+      --state merged \
+      --base "$default_branch" \
+      --limit 100 \
+      --search "merged:>=$since_date" \
+      --json number,title,mergedAt \
+      --jq 'sort_by(.mergedAt) | .[] | "- #" + (.number | tostring) + " " + .title' \
+      2>/dev/null || true)"
+
+    if [[ -n "${pr_lines//[[:space:]]/}" ]]; then
+      printf '%s\n' "$pr_lines"
+      return 0
     fi
-    echo "Pre-release checks passed."
-  fi
 
-  case "$version_file" in
-    package.json)
-      if command -v jq >/dev/null 2>&1; then
-        local tmp_pkg
-        tmp_pkg="$(jq --arg v "$new_version" '.version = $v' "$target_dir/package.json")"
-        printf '%s\n' "$tmp_pkg" > "$target_dir/package.json"
-      else
-        (cd "$target_dir" && node -e "
-          const fs = require('fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.version = process.argv[1];
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-        " "$new_version")
-      fi
-      ;;
-    pyproject.toml)
-      local escaped_current escaped_new
-      escaped_current="$(printf '%s\n' "$current_version" | sed 's/[][\.^$*]/\\&/g')"
-      escaped_new="$(printf '%s\n' "$new_version" | sed 's/[&\\/]/\\&/g')"
-      sed -i "s/^version = \"${escaped_current}\"/version = \"${escaped_new}\"/" "$target_dir/pyproject.toml"
-      ;;
-    VERSION)
-      printf '%s\n' "$new_version" > "$target_dir/VERSION"
-      ;;
-  esac
+    return 1
+  }
 
-  if [[ -f "$target_dir/CHANGELOG.md" ]]; then
-    local release_date
+  collect_release_pr_titles_from_git() {
+    local target="$1"
+    local last_tag="$2"
+    local range="HEAD"
+    local printed=1 subject
+
+    if [[ -n "$last_tag" ]]; then
+      range="$last_tag..HEAD"
+    fi
+
+    while IFS= read -r subject; do
+      [[ -n "$subject" ]] || continue
+      printf -- '- %s\n' "$subject"
+      printed=0
+    done < <(git -C "$target" log --first-parent --pretty=format:%s "$range" 2>/dev/null | grep -vE '^release: v' || true)
+
+    return $printed
+  }
+
+  collect_release_pr_titles() {
+    local target="$1"
+    local default_branch="$2"
+    local last_tag="$3"
+    local since_date="1970-01-01"
+
+    if [[ -n "$last_tag" ]]; then
+      since_date="$(git -C "$target" log -1 --format=%cs "$last_tag" 2>/dev/null || printf '1970-01-01')"
+    fi
+
+    collect_release_pr_titles_via_gh "$target" "$default_branch" "$since_date" || \
+      collect_release_pr_titles_from_git "$target" "$last_tag"
+  }
+
+  extract_unreleased_changelog_body() {
+    local changelog_file="$1/CHANGELOG.md"
+
+    [[ -f "$changelog_file" ]] || return 0
+
+    awk '
+      /^## \[Unreleased\]$/ { capture=1; next }
+      capture && /^## \[/ { exit }
+      capture { print }
+    ' "$changelog_file"
+  }
+
+  build_release_notes() {
+    local target="$1"
+    local new_version="$2"
+    local default_branch="$3"
+    local last_tag="$4"
+    local release_date pr_lines unreleased_body
+
     release_date="$(date +%Y-%m-%d)"
-    sed -i "s/^## \[Unreleased\]/## [Unreleased]\n\n## [$new_version] - $release_date/" "$target_dir/CHANGELOG.md"
-  fi
+    pr_lines="$(collect_release_pr_titles "$target" "$default_branch" "$last_tag" || true)"
+    unreleased_body="$(extract_unreleased_changelog_body "$target" || true)"
 
-  git -C "$target_dir" add -A
-  git -C "$target_dir" commit -m "release: v$new_version"
-  git -C "$target_dir" tag -a "$tag_name" -m "Release $tag_name"
+    printf '## [%s] - %s\n' "$new_version" "$release_date"
 
-  echo ""
-  echo "Release $tag_name created"
-  echo "Push with: git push origin $default_branch --tags"
-}
+    if [[ -n "${pr_lines//[[:space:]]/}" ]]; then
+      printf '\n### Pull Requests\n%s\n' "$pr_lines"
+    fi
+
+    if [[ -n "${unreleased_body//[[:space:]]/}" ]]; then
+      printf '\n%s\n' "$unreleased_body"
+    elif [[ -z "${pr_lines//[[:space:]]/}" ]]; then
+      printf '\n### Changed\n\n- No release-note entries were generated.\n'
+    fi
+  }
+
+  write_release_notes_to_changelog() {
+    local target="$1"
+    local release_notes="$2"
+    local changelog_file="$target/CHANGELOG.md"
+    local header tail tmp_file
+
+    [[ -f "$changelog_file" ]] || return 0
+
+    if ! grep -q '^## \[Unreleased\]$' "$changelog_file"; then
+      printf '\n%s\n' "$release_notes" >> "$changelog_file"
+      return 0
+    fi
+
+    header="$(awk '1; /^## \[Unreleased\]$/ { exit }' "$changelog_file")"
+    tail="$(awk '
+      /^## \[Unreleased\]$/ { capture=1; found=1; next }
+      capture && /^## \[/ { capture=0 }
+      !capture && found { print }
+    ' "$changelog_file")"
+
+    tmp_file="$(mktemp "${TMPDIR:-/tmp}/kite-changelog.XXXXXX")"
+    {
+      printf '%s\n\n' "$header"
+      printf '%s\n' "$release_notes"
+      if [[ -n "${tail//[[:space:]]/}" ]]; then
+        printf '\n%s\n' "$tail"
+      fi
+    } > "$tmp_file"
+
+    mv "$tmp_file" "$changelog_file"
+  }
+
+  apply_release_version() {
+    local version_file="$1"
+    local current_version="$2"
+    local new_version="$3"
+
+    case "$version_file" in
+      package.json)
+        if command -v jq >/dev/null 2>&1; then
+          local tmp_pkg
+          tmp_pkg="$(jq --arg v "$new_version" '.version = $v' "$target_dir/package.json")"
+          printf '%s\n' "$tmp_pkg" > "$target_dir/package.json"
+        else
+          (cd "$target_dir" && node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = process.argv[1];
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          " "$new_version")
+        fi
+        ;;
+      pyproject.toml)
+        local escaped_current escaped_new
+        escaped_current="$(printf '%s\n' "$current_version" | sed 's/[][[\.^$*]/\\&/g')"
+        escaped_new="$(printf '%s\n' "$new_version" | sed 's/[&\\/]/\\&/g')"
+        sed -i "s/^version = \"${escaped_current}\"/version = \"${escaped_new}\"/" "$target_dir/pyproject.toml"
+        ;;
+      VERSION)
+        printf '%s\n' "$new_version" > "$target_dir/VERSION"
+        ;;
+    esac
+  }
+
+  print_release_preview() {
+    local mode_label="$1"
+    local current_branch="$2"
+    local default_branch="$3"
+    local version_file="$4"
+    local current_version="$5"
+    local new_version="$6"
+    local tag_name="$7"
+    local last_tag="$8"
+    local release_notes="$9"
+
+    echo "Release mode: $mode_label"
+    echo "Current branch: ${current_branch:-<none>}"
+    echo "Default branch: $default_branch"
+    echo "Previous tag: ${last_tag:-<none>}"
+    echo "Version source: $version_file"
+    echo "Current version: $current_version"
+    echo "New version: $new_version"
+    echo "Tag: $tag_name"
+    echo ""
+    echo "Release notes preview:"
+    printf '%s\n' "$release_notes"
+  }
+
+  run_release_prepare() {
+    local bump_type="patch" release_dry_run=0 confirm=0 skip_checks=0
+    local version_info version_file current_version new_version tag_name
+    local current_branch default_branch last_tag release_notes
+
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --bump)
+          bump_type="${2:?Missing value for --bump}"
+          shift 2
+          ;;
+        --dry-run)
+          release_dry_run=1
+          shift
+          ;;
+        --confirm)
+          confirm=1
+          shift
+          ;;
+        --skip-checks)
+          skip_checks=1
+          shift
+          ;;
+        -h|--help)
+          release_help
+          return 0
+          ;;
+        *)
+          echo "Unexpected argument: $1" >&2
+          release_help >&2
+          return 1
+          ;;
+      esac
+    done
+
+    validate_release_bump_type "$bump_type" || return 1
+
+    echo "Release prepare target: $target_dir"
+
+    if ! command -v git >/dev/null 2>&1 || ! git -C "$target_dir" rev-parse --git-dir >/dev/null 2>&1; then
+      echo "[warn] Not a git repository"
+      return 1
+    fi
+
+    current_branch="$(git -C "$target_dir" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    default_branch="$(default_branch_name "$target_dir")"
+
+    if [[ $skip_checks -ne 1 ]]; then
+      echo ""
+      echo "Running release gates on the feature branch..."
+      if ! run_verify_feature; then
+        echo ""
+        echo "[error] Release prepare requires a clean, merge-ready feature branch."
+        return 1
+      fi
+      if ! run_test; then
+        echo ""
+        echo "[error] Tests failed. Fix before preparing the release, or use --skip-checks to bypass."
+        return 1
+      fi
+      if ! run_audit; then
+        echo ""
+        echo "[error] Audit has findings. Review before preparing the release, or use --skip-checks to bypass."
+        return 1
+      fi
+      echo "Release gates passed."
+    else
+      echo "[warn] Skipping release gates (--skip-checks)"
+    fi
+
+    version_info="$(bump_version "$bump_type")"
+    if [[ -z "$version_info" ]]; then
+      return 1
+    fi
+
+    read -r version_file current_version new_version _ <<< "$version_info"
+    tag_name="v$new_version"
+    last_tag="$(latest_release_tag "$target_dir")"
+    release_notes="$(build_release_notes "$target_dir" "$new_version" "$default_branch" "$last_tag")"
+
+    echo ""
+    print_release_preview "prepare" "$current_branch" "$default_branch" "$version_file" "$current_version" "$new_version" "$tag_name" "$last_tag" "$release_notes"
+
+    if [[ $confirm -eq 1 ]]; then
+      echo ""
+      echo "[info] release prepare never mutates the repository; --confirm is ignored."
+    fi
+    if [[ $release_dry_run -eq 1 ]]; then
+      echo ""
+      echo "Dry run - no changes written"
+    fi
+
+    echo ""
+    echo "Next step: merge ${current_branch:-<feature-branch>} into $default_branch, then run:"
+    echo "  kite release publish --bump $bump_type --confirm $target_dir"
+  }
+
+  run_release_publish() {
+    local bump_type="patch" release_dry_run=0 confirm=0 skip_checks=0
+    local version_info version_file current_version new_version tag_name
+    local current_branch default_branch last_tag release_notes
+
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --bump)
+          bump_type="${2:?Missing value for --bump}"
+          shift 2
+          ;;
+        --dry-run)
+          release_dry_run=1
+          shift
+          ;;
+        --confirm)
+          confirm=1
+          shift
+          ;;
+        --skip-checks)
+          skip_checks=1
+          shift
+          ;;
+        -h|--help)
+          release_help
+          return 0
+          ;;
+        *)
+          echo "Unexpected argument: $1" >&2
+          release_help >&2
+          return 1
+          ;;
+      esac
+    done
+
+    validate_release_bump_type "$bump_type" || return 1
+
+    echo "Release publish target: $target_dir"
+
+    if ! command -v git >/dev/null 2>&1 || ! git -C "$target_dir" rev-parse --git-dir >/dev/null 2>&1; then
+      echo "[warn] Not a git repository"
+      return 1
+    fi
+
+    current_branch="$(git -C "$target_dir" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    default_branch="$(default_branch_name "$target_dir")"
+
+    if [[ "$current_branch" != "$default_branch" ]]; then
+      echo "[warn] Publish must run from $default_branch (currently on ${current_branch:-<none>})"
+      return 1
+    fi
+
+    if [[ -n "$(git -C "$target_dir" status --porcelain)" ]]; then
+      echo "[warn] Working tree is not clean; commit changes first"
+      return 1
+    fi
+
+    version_info="$(bump_version "$bump_type")"
+    if [[ -z "$version_info" ]]; then
+      return 1
+    fi
+
+    read -r version_file current_version new_version _ <<< "$version_info"
+    tag_name="v$new_version"
+    last_tag="$(latest_release_tag "$target_dir")"
+    release_notes="$(build_release_notes "$target_dir" "$new_version" "$default_branch" "$last_tag")"
+
+    if git -C "$target_dir" rev-parse -q --verify "refs/tags/$tag_name" >/dev/null 2>&1; then
+      echo "[warn] Tag $tag_name already exists"
+      return 1
+    fi
+
+    echo ""
+    print_release_preview "publish" "$current_branch" "$default_branch" "$version_file" "$current_version" "$new_version" "$tag_name" "$last_tag" "$release_notes"
+
+    if [[ $release_dry_run -eq 1 || $confirm -ne 1 ]]; then
+      echo ""
+      if [[ $release_dry_run -eq 1 ]]; then
+        echo "Dry run - no changes written"
+      else
+        echo "Preview only. Re-run with --confirm to publish."
+      fi
+      return 0
+    fi
+
+    if [[ $skip_checks -ne 1 ]]; then
+      echo ""
+      echo "Running publish gates on $default_branch..."
+      if ! run_test; then
+        echo ""
+        echo "[error] Tests failed. Fix before publishing, or use --skip-checks to bypass."
+        return 1
+      fi
+      if ! run_audit; then
+        echo ""
+        echo "[error] Audit has findings. Review before publishing, or use --skip-checks to bypass."
+        return 1
+      fi
+      echo "Publish gates passed."
+    else
+      echo "[warn] Skipping publish gates (--skip-checks)"
+    fi
+
+    apply_release_version "$version_file" "$current_version" "$new_version"
+    write_release_notes_to_changelog "$target_dir" "$release_notes"
+
+    git -C "$target_dir" add -A
+    git -C "$target_dir" commit -m "release: v$new_version"
+    git -C "$target_dir" tag -a "$tag_name" -m "Release $tag_name"
+
+    echo ""
+    echo "Release $tag_name created"
+    echo "Push with: git push origin $default_branch --tags"
+  }
+
+  run_release() {
+    local subcommand="publish"
+    local legacy_mode=1
+
+    if [[ $# -gt 0 ]]; then
+      case "$1" in
+        prepare|publish)
+          subcommand="$1"
+          legacy_mode=0
+          shift
+          ;;
+        -h|--help)
+          release_help
+          return 0
+          ;;
+      esac
+    fi
+
+    if [[ $legacy_mode -eq 1 ]]; then
+      echo "[info] kite release without a subcommand defaults to publish; use 'kite release prepare' for pre-merge gates."
+    fi
+
+    case "$subcommand" in
+      prepare) run_release_prepare "$@" ;;
+      publish) run_release_publish "$@" ;;
+    esac
+  }
 
 emit_bash_completion() {
   cat <<'COMPEOF'
@@ -1252,17 +2421,20 @@ _kite_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local commands="install update doctor status new test audit release verify completion help"
+  local commands="install update doctor status new test audit release verify feature explain completion help"
   local install_sub="speckit"
   local update_sub="workspace"
   local verify_sub="feature"
+  local explain_stages="discover brief constitution specify design plan tasks analyze implement test review verify release operate learn"
   local update_options="--merge --dry-run --with-speckit --force-speckit-init --speckit-version --repo --ref --source-dir -h --help"
   local install_options="--force-speckit-init --speckit-version --repo --ref --source-dir -h --help"
   local doctor_options="--speckit-version --repo --ref --source-dir -h --help"
   local status_options="--json --repo --ref --source-dir -h --help"
+  local feature_options="--json -h --help"
   local test_options="--e2e -h --help"
   local audit_options="--fix -h --help"
-  local new_options="--template --with-speckit --speckit-version --git-init-commit --repo --ref --source-dir -h --help"
+  local new_options="--template --license --deploy-target --test-tier --with-speckit --speckit-version --git-init-commit --repo --ref --source-dir -h --help"
+  local release_subcommands="prepare publish"
   local release_options="--bump --dry-run --confirm --skip-checks -h --help"
 
   if [[ $cword -eq 1 ]]; then
@@ -1295,10 +2467,24 @@ _kite_completion() {
       ;;
     doctor) COMPREPLY=($(compgen -W "$doctor_options" -- "$cur")) ;;
     status) COMPREPLY=($(compgen -W "$status_options" -- "$cur")) ;;
+    feature) COMPREPLY=($(compgen -W "$feature_options" -- "$cur")) ;;
+    explain)
+      if [[ $cword -eq 2 ]]; then
+        COMPREPLY=($(compgen -W "$explain_stages" -- "$cur"))
+      fi
+      ;;
     test) COMPREPLY=($(compgen -W "$test_options" -- "$cur")) ;;
     audit) COMPREPLY=($(compgen -W "$audit_options" -- "$cur")) ;;
     new) COMPREPLY=($(compgen -W "$new_options" -- "$cur")) ;;
-    release) COMPREPLY=($(compgen -W "$release_options" -- "$cur")) ;;
+    release)
+      if [[ $cword -eq 2 ]]; then
+        COMPREPLY=($(compgen -W "$release_subcommands $release_options" -- "$cur"))
+      elif [[ "$secondary" == "prepare" || "$secondary" == "publish" ]]; then
+        COMPREPLY=($(compgen -W "$release_options" -- "$cur"))
+      else
+        COMPREPLY=($(compgen -W "$release_options" -- "$cur"))
+      fi
+      ;;
     help) COMPREPLY=($(compgen -W "$commands" -- "$cur")) ;;
   esac
 }
@@ -1605,11 +2791,17 @@ parse_help_target() {
     "new")
       show_help "new"
       ;;
-    "release")
+    "release"|"release prepare"|"release publish")
       show_help "release"
       ;;
     "verify feature")
       show_help "verify-feature"
+      ;;
+    "feature")
+      show_help "feature"
+      ;;
+    "explain")
+      show_help "explain"
       ;;
     *)
       show_help "general"
@@ -1680,6 +2872,14 @@ main() {
       mode="verify-feature"
       shift 2
       ;;
+    feature)
+      mode="feature"
+      shift 1
+      ;;
+    explain)
+      mode="explain"
+      shift 1
+      ;;
     completion)
       mode="completion"
       shift 1
@@ -1721,6 +2921,38 @@ main() {
   # Handle completion mode
   if [[ "$mode" == "completion" ]]; then
     run_completion "${1:-bash}"
+    exit $?
+  fi
+
+  # Handle explain mode (takes a single stage arg, no target-dir)
+  if [[ "$mode" == "explain" ]]; then
+    run_explain "$@"
+    exit $?
+  fi
+
+  # Handle feature mode (optional target-dir and --json)
+  if [[ "$mode" == "feature" ]]; then
+    local feature_json=0
+    local -a feature_rest=()
+    local farg
+    for farg in "$@"; do
+      case "$farg" in
+        --json) feature_json=1 ;;
+        -h|--help) show_help "feature"; exit 0 ;;
+        -*) echo "Unknown option: $farg" >&2; show_help "feature" >&2; exit 1 ;;
+        *) feature_rest+=("$farg") ;;
+      esac
+    done
+    if [[ ${#feature_rest[@]} -gt 1 ]]; then
+      echo "Unexpected arguments: ${feature_rest[*]:1}" >&2
+      show_help "feature" >&2
+      exit 1
+    fi
+    if [[ ${#feature_rest[@]} -eq 1 ]]; then
+      target_dir="${feature_rest[0]}"
+    fi
+    normalize_target_dir
+    run_feature_status "$feature_json"
     exit $?
   fi
 

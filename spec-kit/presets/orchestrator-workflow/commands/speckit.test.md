@@ -31,3 +31,4 @@ $ARGUMENTS
    - Summary of any failures with file and line references
    - Whether the feature branch is ready for code review
 8. If no test framework is discovered, report that and recommend setting one up appropriate to the project stack.
+9. When results are meaningful enough to persist (non-trivial runs, flakes, or pre-review summaries), write them to `specs/<feature>/test-results.md`. Open the file with the artifact front matter block described in `spec-kit/templates/artifact-front-matter.md`. Set `stage: test`, `last_agent: speckit.test`, refresh `updated_at`, and preserve `created_at` if it already exists.

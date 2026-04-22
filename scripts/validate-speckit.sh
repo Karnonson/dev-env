@@ -37,6 +37,8 @@ bash "$repo_root/install.sh" --with-speckit --speckit-version "$speckit_version"
 cd "$target_dir"
 
 test -f .specify/presets/orchestrator-workflow/preset.yml
+test -f .specify/presets/orchestrator-workflow/commands/speckit.discover.md
+test -f .specify/presets/orchestrator-workflow/commands/speckit.brief.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.test.md
@@ -46,6 +48,9 @@ test -f .github/agents/speckit.design.agent.md
 test -f .github/agents/speckit.implement.agent.md
 grep -q "feature branch" .specify/presets/orchestrator-workflow/commands/speckit.implement.md
 grep -q "Merge to \`main\` only" .specify/presets/orchestrator-workflow/commands/speckit.implement.md
+grep -q "market-validation.md" .specify/presets/orchestrator-workflow/commands/speckit.discover.md
+grep -q "command: speckit.discover" .specify/workflows/orchestrator-design-first/workflow.yml
+grep -q "command: speckit.brief" .specify/workflows/orchestrator-design-first/workflow.yml
 test -d .specify
 test -d .devcontainer
 test -d .github/prompts
