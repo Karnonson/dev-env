@@ -32,9 +32,11 @@ $ARGUMENTS
 8. If tests fail, read the error output and attempt to fix the failing tests or implementation at least once before reporting failure.
 9. If a required tier cannot run because the repo lacks a runner or config, report that as a verification gap instead of silently skipping it.
 10. Report test results:
-   - Total tests run, passed, failed, skipped
-   - Which tiers ran, which were skipped, and why
-   - Summary of any failures with file and line references
-   - Whether the feature branch is ready for code review
+
+- Total tests run, passed, failed, skipped
+- Which tiers ran, which were skipped, and why
+- Summary of any failures with file and line references
+- Whether the feature branch is ready for code review
+
 11. If no test framework is discovered for the required tiers, report that and recommend setting one up appropriate to the project stack.
 12. When results are meaningful enough to persist (non-trivial runs, flakes, or pre-review summaries), write them to `specs/<feature>/test-results.md`. Open the file with the artifact front matter block described in `spec-kit/templates/artifact-front-matter.md`. Set `stage: test`, `last_agent: speckit.test`, refresh `updated_at`, and preserve `created_at` if it already exists.
