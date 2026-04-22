@@ -3,19 +3,13 @@
 [![CI](https://github.com/Karnonson/kite/actions/workflows/validate.yml/badge.svg)](https://github.com/Karnonson/kite/actions/workflows/validate.yml)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-kite is a container-native Speckit workflow CLI and reusable dev-container starter for future repositories. It installs workspace assets, bootstraps the bundled Spec Kit workflow, and adds branch-first verification, test, audit, and release commands inside the container.
+kite is a container-first Speckit workflow CLI and reusable base devcontainer for future repositories. It installs workspace assets, keeps Copilot and Speckit guidance versioned with the repo, and adds branch-first verification, test, audit, and release commands inside the container.
 
 ## Quickstart
 
-Install kite assets into an existing repository from the repository root:
+Supported Kite workflows run inside a dev container. Start from the bundled `base` container in a new repo, or keep your existing `.devcontainer/` and extend it so the same container contract still holds: `kite` is available in the container, the post-create setup runs, workspace `.github/` customizations stay present, and `kite doctor` plus `kite install speckit` work from the terminal.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- .
-```
-
-If the target repository already has a `.devcontainer/` folder, the host installer stops instead of merging it. Re-run with `--force` to replace the existing workspace assets, or keep the existing container setup and refresh assets later from inside the container with `kite update workspace --merge`.
-
-Reopen the repository in the dev container, then verify and bootstrap the workflow:
+After the repository opens in that container, verify and bootstrap the workflow:
 
 ```bash
 kite doctor .
@@ -23,20 +17,25 @@ kite install speckit .
 kite status .
 ```
 
-Scaffold a new repository instead of retrofitting an existing one:
+If you need to copy the workspace assets into an existing repository first, the host-side bootstrap is available as a secondary path. It requires `curl` and `tar` on the host. Add `uvx` or `specify` only if you also want host-side Speckit bootstrap with `--with-speckit`.
 
 ```bash
-kite new my-app --template fullstack --with-speckit
+curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- .
 ```
+
+If the target repository already has a `.devcontainer/` folder, the installer preserves it by default and refreshes the Kite-owned support files under `.devcontainer/bin/kite`, `.devcontainer/kite-post-create.sh`, and `.devcontainer/README.kite.md`. Use `--force` only when you intend to swap in the bundled container. After reopening in that container:
+
+- run `bash .devcontainer/kite-post-create.sh` if `kite` is not yet on `PATH`
+- run `kite doctor .`
 
 ## Minimal Example
 
-Preview a workspace refresh, inspect machine-readable status, and run the pre-merge guardrails:
+Preview a workspace refresh, inspect machine-readable status, and check the active feature handoff:
 
 ```bash
 kite update workspace --dry-run .
 kite status --json .
-kite verify feature .
+kite feature .
 ```
 
 ## Documentation
@@ -49,7 +48,7 @@ kite verify feature .
 
 ## What kite installs
 
-- `.devcontainer/` for the reusable development container setup
+- `.devcontainer/` for the single base devcontainer entrypoint and post-create setup
 - `.github/prompts/`, `.github/agents/`, and `.github/instructions/` for workspace-scoped Copilot customizations
 - `.github/copilot-instructions.md` for repo workflow conventions
 - `.kite/config.yml` for repo-local scaffold and workflow defaults

@@ -12,7 +12,8 @@ kite help <command>
 ## Examples
 
 ```bash
-kite help doctor
+kite help install speckit
+kite help explain
 kite help update workspace
 kite help release
 ```
@@ -20,3 +21,5 @@ kite help release
 ## Notes
 
 Most commands also accept `-h` or `--help`, but `kite help` is useful when you want to inspect command usage without retyping the whole command line.
+
+Use these docs for the supported defaults: container-first setup, the single base devcontainer, and the default lifecycle without `brief`.

@@ -30,4 +30,4 @@ kite test --e2e .
 
 ## Notes
 
-The default profile comes from `.kite/config.yml` when present. Use `kite new --test-tier ...` to record the preferred profile for future test runs.
+The default profile comes from `.kite/config.yml` when present. Edit that file directly when you want to change the preferred verification profile for future test runs.

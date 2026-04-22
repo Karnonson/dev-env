@@ -39,3 +39,5 @@ kite update workspace --with-speckit .
 ## Notes
 
 Use `--dry-run` before destructive refreshes, especially when the target repository contains local changes under `.devcontainer/`, `.github/`, or `docs/errors/`.
+
+When you are extending the bundled base container or preserving an existing `.devcontainer/`, prefer `--merge`, rebuild if needed, and then run `kite doctor .` from the container terminal.

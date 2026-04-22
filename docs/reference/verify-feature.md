@@ -27,4 +27,4 @@ kite verify feature .
 
 ## Notes
 
-Use this command before opening final merge review or before running `kite release prepare`.
+Use this command before opening final merge review or before running the release-prepare step.

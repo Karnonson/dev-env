@@ -27,4 +27,6 @@ kite install speckit --source-dir /path/to/kite .
 
 ## When To Use It
 
-Use this command after a host-side `install.sh` run when you want to finish Speckit bootstrap inside the dev container.
+Use this command inside the dev container after the workspace assets are already present. That is the normal path after a host bootstrap, and it is also the verification step after you extend an existing `.devcontainer/` without replacing it.
+
+Host-side `--with-speckit` remains available as a secondary shortcut and requires `curl`, `tar`, and `uvx` or `specify` on the host.

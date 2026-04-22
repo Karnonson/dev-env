@@ -43,4 +43,4 @@ kite release publish --bump major --confirm --skip-checks .
 
 ## Recommended Flow
 
-Run `prepare` on the feature branch, merge the branch, switch to the default branch, then run `publish --confirm`.
+Run `prepare` on the feature branch, merge the branch, switch to the default branch, then run the publish step with `--confirm` enabled.

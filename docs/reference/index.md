@@ -2,6 +2,8 @@
 
 These pages document the current `kite` command surface from the help text implemented in `.devcontainer/bin/kite`.
 
+The supported product story is container-first: run `kite` inside a repository opened in the bundled `base` devcontainer or in an existing container that preserves the same `kite`, post-create, and workspace-asset contract. Where the live help text still exposes compatibility items, these docs call out the recommended defaults.
+
 ## Command Basics
 
 - Most commands accept an optional `[target-directory]`. When omitted, kite uses the current working directory.
@@ -17,7 +19,6 @@ These pages document the current `kite` command surface from the help text imple
 
 ## Project Commands
 
-- [kite new](new.md)
 - [kite test](test.md)
 - [kite audit](audit.md)
 - [kite release](release.md)
@@ -27,6 +28,8 @@ These pages document the current `kite` command surface from the help text imple
 
 - [kite feature](feature.md)
 - [kite explain](explain.md)
+
+The recommended lifecycle is `feature start -> discover -> constitution -> specify -> design -> plan -> tasks -> analyze -> implement -> test -> review`. `brief` remains legacy artifact language rather than a recommended default stage.
 
 ## Shell Integration And Help
 

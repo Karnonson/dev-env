@@ -9,7 +9,7 @@ and ownership without heuristics.
 
 ```yaml
 ---
-stage: <discover|brief|constitution|specify|design|plan|tasks|analyze|implement|test|review|verify|release|operate|learn>
+stage: <discover|constitution|specify|design|plan|tasks|analyze|implement|test|review|verify|release|operate|learn>
 feature: <feature-slug>
 status: <draft|in-review|approved|archived>
 owner: <human-name-or-role>
@@ -23,7 +23,7 @@ updated_at: <YYYY-MM-DD>
 
 | Field        | Purpose                                     | Notes                                                                                                                           |
 | ------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `stage`      | Lifecycle stage this artifact belongs to    | Must match one of the stages listed by `kite explain`.                                                                          |
+| `stage`      | Lifecycle stage this artifact belongs to    | Must match one of the supported stages listed by `kite explain`. Legacy optional artifacts such as `brief` may keep their historical stage value when needed. |
 | `feature`    | Feature slug                                | Matches the directory name under `specs/` and `.specify/feature.json` name.                                                     |
 | `status`     | Editorial state                             | `draft` while being written; `in-review` when awaiting review; `approved` once signed off; `archived` for superseded artifacts. |
 | `owner`      | Accountable human or role                   | Example: `@karnon`, `Product`, `Backend Dev`.                                                                                   |
@@ -36,7 +36,6 @@ updated_at: <YYYY-MM-DD>
 Canonical artifacts:
 
 - `specs/<feature>/discovery.md`
-- `specs/<feature>/brief.md`
 - `specs/<feature>/spec.md`
 - `specs/<feature>/plan.md`
 - `specs/<feature>/tasks.md`
@@ -48,6 +47,10 @@ Canonical artifacts:
 - `specs/<feature>/learn.md`
 - `.specify/memory/constitution.md`
 - `.specify/memory/design-direction.md`
+
+Optional compatibility artifact:
+
+- `specs/<feature>/brief.md`
 
 Optional but recommended for durable team notes under
 `team/agents/<agent>/<YYYY-MM-DD>-<feature>.md`.

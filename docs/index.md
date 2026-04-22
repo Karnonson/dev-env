@@ -1,17 +1,19 @@
 # Documentation
 
-kite combines a reusable dev-container workspace setup with a container-native CLI for installing assets, bootstrapping Speckit, and enforcing a branch-first delivery flow.
+kite combines a reusable base devcontainer with a container-first CLI for installing workspace assets, bootstrapping Speckit, and enforcing a branch-first delivery flow.
+
+Supported Kite workflows run inside a container that either uses the bundled `base` devcontainer or preserves the same contract in an existing repo-owned `.devcontainer/`.
 
 ## Start Here
 
-- [Getting started](getting-started.md) for installation, container setup, and first-run checks
+- [Getting started](getting-started.md) for the container contract, safe base-container extension, and host-side prerequisites
 - [Common workflows](usage/common-workflows.md) for day-to-day CLI usage patterns
 - [CLI reference](reference/index.md) for command-by-command documentation
 - [Error recovery guides](errors/index.md) for failure-specific next steps printed by `kite`
 
 ## Command Groups
 
-### Workspace setup
+### Workspace and container setup
 
 - [kite install speckit](reference/install-speckit.md)
 - [kite update workspace](reference/update-workspace.md)
@@ -20,7 +22,6 @@ kite combines a reusable dev-container workspace setup with a container-native C
 
 ### Project operations
 
-- [kite new](reference/new.md)
 - [kite test](reference/test.md)
 - [kite audit](reference/audit.md)
 - [kite release](reference/release.md)
@@ -30,6 +31,8 @@ kite combines a reusable dev-container workspace setup with a container-native C
 
 - [kite feature](reference/feature.md)
 - [kite explain](reference/explain.md)
+
+The recommended lifecycle is `feature start -> discover -> constitution -> specify -> design -> plan -> tasks -> analyze -> implement -> test -> review`. Legacy repos may still contain a `brief.md` artifact on disk, but the supported flow does not use it.
 
 ### Shell integration and help
 

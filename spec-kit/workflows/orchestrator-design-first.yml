@@ -7,12 +7,12 @@ workflow:
   version: "2.2.0"
   author: "Karnon"
   description: >
-    Strategist -> discover -> brief -> constitution -> specify -> design ->
+    Strategist -> feature start -> discover -> constitution -> specify -> design ->
     plan -> tasks -> analyze -> backend -> UI -> test -> review on a
     feature branch with explicit gates.
 
 requires:
-  speckit_version: ">=0.6.1"
+  speckit_version: ">=0.7.0"
   integrations:
     any: ["copilot", "claude", "gemini"]
 
@@ -40,9 +40,29 @@ steps:
         still need discovery.
       - The feature name describes the outcome, not just an implementation
         detail.
-      - The team wants a guided discovery -> brief -> Speckit workflow.
+      - The team wants a guided feature start -> discovery -> Speckit workflow.
 
       Reject if there is not yet a concrete idea to shape.
+    options: [approve, abort]
+    on_reject: abort
+
+  - id: start-feature
+    type: gate
+    message: |
+      Before discovery writes canonical artifacts, start or align the active
+      feature context.
+
+      Checklist:
+      - The feature identifier is stable enough to use for the canonical
+        `specs/<feature>/` directory.
+      - The current git branch is the feature branch for this work, not
+        `main`, `master`, or an unrelated branch.
+      - `.specify/feature.json` points at the same feature identifier that
+        discovery will write.
+      - The branch and persisted feature context agree before later stages
+        reuse them.
+
+      Reject if the branch or persisted feature context is not ready.
     options: [approve, abort]
     on_reject: abort
 
@@ -55,7 +75,7 @@ steps:
   - id: review-discovery
     type: gate
     message: |
-      Review the discovery artifact before drafting the product brief.
+      Review the discovery artifact before locking project standards.
 
       Checklist:
       - Problem, target user, and desired outcome are explicit in plain
@@ -65,31 +85,7 @@ steps:
       - If market-fit uncertainty is material, Marketer findings are attached
         or the decision to skip them is explicit.
 
-      Reject if the brief would still be built on guesswork.
-    options: [approve, reject]
-    on_reject: abort
-
-  - id: brief
-    command: speckit.brief
-    integration: "{{ inputs.integration }}"
-    input:
-      args: "{{ inputs.feature_name }}"
-
-  - id: review-brief
-    type: gate
-    message: |
-      Review the plain-language brief before constitution and specification.
-
-      Checklist:
-      - Problem, user, value, constraints, success metric, and non-goals are
-        clear.
-      - Non-technical stakeholders can read it without translation.
-      - Product sign-off is explicit or the open approval step is documented.
-      - The technical spec can be derived from the brief without inventing
-        product intent.
-
-      Reject if constitution or specification would still need to guess what
-      the product is trying to achieve.
+      Reject if constitution or specification would still be built on guesswork.
     options: [approve, reject]
     on_reject: abort
 
@@ -169,7 +165,7 @@ steps:
       Review the plan before generating tasks.
 
       Checklist:
-      - Scope still matches the brief and spec.
+      - Scope still matches the approved discovery and spec.
       - Risks are listed and each has a mitigation or owner.
       - Phasing makes sense for the feature shape.
       - Out-of-scope work is explicit.

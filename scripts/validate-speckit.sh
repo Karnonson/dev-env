@@ -38,7 +38,7 @@ cd "$target_dir"
 
 test -f .specify/presets/orchestrator-workflow/preset.yml
 test -f .specify/presets/orchestrator-workflow/commands/speckit.discover.md
-test -f .specify/presets/orchestrator-workflow/commands/speckit.brief.md
+test -f .specify/presets/orchestrator-workflow/commands/speckit.plan.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.test.md
@@ -50,9 +50,11 @@ grep -q "feature branch" .specify/presets/orchestrator-workflow/commands/speckit
 grep -q "Merge to \`main\` only" .specify/presets/orchestrator-workflow/commands/speckit.implement.md
 grep -q "market-validation.md" .specify/presets/orchestrator-workflow/commands/speckit.discover.md
 grep -q "command: speckit.discover" .specify/workflows/orchestrator-design-first/workflow.yml
-grep -q "command: speckit.brief" .specify/workflows/orchestrator-design-first/workflow.yml
+grep -q "command: speckit.plan" .specify/workflows/orchestrator-design-first/workflow.yml
+grep -q "id: start-feature" .specify/workflows/orchestrator-design-first/workflow.yml
 test -d .specify
 test -d .devcontainer
+test ! -f .devcontainer/switch-profile.sh
 test -d .github/prompts
 test -d .github/agents
 test -d .github/instructions
@@ -61,6 +63,8 @@ test ! -d spec-kit
 
 mkdir -p "$partial_target_dir/.specify/memory"
 printf 'KEEP_ME\n' > "$partial_target_dir/.specify/memory/constitution.md"
+mkdir -p "$partial_target_dir/.devcontainer"
+printf '{"name":"existing"}\n' > "$partial_target_dir/.devcontainer/devcontainer.json"
 mkdir -p "$partial_target_dir/.github/instructions"
 printf 'KEEP_AGENT_RULES\n' > "$partial_target_dir/.github/instructions/AI Agent Development.instructions.md"
 mkdir -p "$partial_target_dir/.github"
@@ -69,6 +73,10 @@ printf 'KEEP_COPILOT_RULES\n' > "$partial_target_dir/.github/copilot-instruction
 bash "$repo_root/install.sh" --with-speckit --speckit-version "$speckit_version" --source-dir "$repo_root" "$partial_target_dir"
 
 grep -qx 'KEEP_ME' "$partial_target_dir/.specify/memory/constitution.md"
+grep -qx '{"name":"existing"}' "$partial_target_dir/.devcontainer/devcontainer.json"
+test -f "$partial_target_dir/.devcontainer/bin/kite"
+test -f "$partial_target_dir/.devcontainer/kite-post-create.sh"
+test -f "$partial_target_dir/.devcontainer/README.kite.md"
 grep -qx 'KEEP_AGENT_RULES' "$partial_target_dir/.github/instructions/AI Agent Development.instructions.md"
 grep -qx 'KEEP_COPILOT_RULES' "$partial_target_dir/.github/copilot-instructions.md"
 test -d "$partial_target_dir/.devcontainer"
@@ -76,6 +84,13 @@ test -d "$partial_target_dir/.github/prompts"
 test -d "$partial_target_dir/.github/agents"
 test -d "$partial_target_dir/.github/instructions"
 test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.design.md"
+
+(
+  cd "$partial_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" status --source-dir "$repo_root" > "$status_log"
+)
+grep -q "Workspace status: current" "$status_log"
+grep -q "Speckit status: ready" "$status_log"
 
 bash "$repo_root/install.sh" --force --with-speckit --force-speckit-init --speckit-version "$speckit_version" --source-dir "$repo_root" "$partial_target_dir"
 
@@ -218,6 +233,7 @@ test -f "$update_target_dir/.specify/presets/orchestrator-workflow/commands/spec
 )
 grep -q "container-native Speckit workflow" "$status_log"
 grep -q "work on a feature branch" "$status_log"
+! grep -q "new <name>" "$status_log"
 
 (
   cd "$update_target_dir"
@@ -246,14 +262,6 @@ grep -q -- "--profile" "$status_log"
 
 bash "$repo_root/.devcontainer/bin/kite" completion bash > "$status_log"
 grep -q "complete -F _kite_completion kite" "$status_log"
-
-(
-  cd "$temp_root"
-  bash "$repo_root/.devcontainer/bin/kite" new generated-project --source-dir "$repo_root" --template fullstack --with-speckit > "$status_log"
-)
-test -d "$temp_root/generated-project/.devcontainer"
-test -f "$temp_root/generated-project/.github/copilot-instructions.md"
-test -f "$temp_root/generated-project/.specify/presets/orchestrator-workflow/commands/speckit.test.md"
 
 mkdir -p "$verify_target_dir"
 git init --initial-branch main "$verify_target_dir" >/dev/null 2>&1

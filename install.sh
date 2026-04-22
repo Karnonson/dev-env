@@ -16,15 +16,17 @@ source_dir="${DEV_ENV_SOURCE_DIR:-}"
 default_speckit_version="0.7.0"
 speckit_version=""
 bootstrap_temp_dir=""
+preserved_existing_devcontainer=0
 
 usage() {
   cat <<EOF
 Usage: install.sh [options] [target-directory]
 
-Install the kite .devcontainer and workspace chat customization assets into a target project.
+Install the kite workspace assets into a target project.
+Preserve an existing .devcontainer by default; use --force to replace it.
 
 Options:
-  --force             Replace existing workspace assets (.devcontainer, .github/*, docs/errors); preserve repo-local .kite/config.yml
+  --force             Replace existing workspace assets (.devcontainer, .github/*, docs/errors); preserve repo-local .kite/config.yml and merge .gitignore safely
   --dry-run           Show what would be installed without writing anything
   --with-speckit      Initialize Spec Kit and install the bundled preset/workflow
   --speckit-only      Only install Spec Kit assets; do not copy kite workspace files
@@ -67,9 +69,9 @@ has_speckit_templates() {
   local required_files=(
     .specify/presets/orchestrator-workflow/preset.yml
     .specify/presets/orchestrator-workflow/commands/speckit.discover.md
-    .specify/presets/orchestrator-workflow/commands/speckit.brief.md
     .specify/presets/orchestrator-workflow/commands/speckit.constitution.md
     .specify/presets/orchestrator-workflow/commands/speckit.design.md
+    .specify/presets/orchestrator-workflow/commands/speckit.plan.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
@@ -186,6 +188,39 @@ asset_merges_missing_by_default() {
   esac
 }
 
+asset_preserves_existing_by_default() {
+  case "$1" in
+    .devcontainer)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+sync_existing_devcontainer_support_files() {
+  local source_root="$1"
+  local target_root="$2"
+  local source_devcontainer="$source_root/.devcontainer"
+  local target_devcontainer="$target_root/.devcontainer"
+
+  mkdir -p "$target_devcontainer"
+
+  if [[ -f "$source_devcontainer/bin/kite" ]]; then
+    mkdir -p "$target_devcontainer/bin"
+    cp "$source_devcontainer/bin/kite" "$target_devcontainer/bin/kite"
+  fi
+  if [[ -f "$source_devcontainer/post-create.sh" ]]; then
+    mkdir -p "$(dirname "$target_devcontainer/kite-post-create.sh")"
+    cp "$source_devcontainer/post-create.sh" "$target_devcontainer/kite-post-create.sh"
+  fi
+  if [[ -f "$source_devcontainer/README.md" ]]; then
+    mkdir -p "$(dirname "$target_devcontainer/README.kite.md")"
+    cp "$source_devcontainer/README.md" "$target_devcontainer/README.kite.md"
+  fi
+}
+
 merge_missing_tree() {
   local source_path="$1"
   local target_path="$2"
@@ -223,6 +258,85 @@ merge_missing_file() {
   if [[ ! -f "$target_path" ]]; then
     cp "$source_path" "$target_path"
   fi
+}
+
+kite_gitignore_template() {
+  cat <<'EOF'
+# Kite / Speckit
+.specify/cache/
+
+# Common local tooling
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.env
+.env.local
+!.env.example
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+coverage/
+htmlcov/
+.pytest_cache/
+EOF
+}
+
+gitignore_has_entry() {
+  local file_path="$1"
+  local entry="$2"
+
+  grep -Fqx -- "$entry" "$file_path" 2>/dev/null
+}
+
+gitignore_has_required_entries() {
+  local file_path="$1"
+  local required_entries=(
+    .specify/cache/
+  )
+  local entry
+
+  for entry in "${required_entries[@]}"; do
+    if ! gitignore_has_entry "$file_path" "$entry"; then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+ensure_gitignore() {
+  local target_root="$1"
+  local target_path="$target_root/.gitignore"
+  local required_entries=(
+    .specify/cache/
+  )
+  local missing_entries=()
+  local entry
+
+  if [[ ! -f "$target_path" ]]; then
+    kite_gitignore_template > "$target_path"
+    return
+  fi
+
+  for entry in "${required_entries[@]}"; do
+    if ! gitignore_has_entry "$target_path" "$entry"; then
+      missing_entries+=("$entry")
+    fi
+  done
+
+  if (( ${#missing_entries[@]} == 0 )); then
+    return
+  fi
+
+  {
+    printf '\n# Kite / Speckit\n'
+    printf '%s\n' "${missing_entries[@]}"
+  } >> "$target_path"
 }
 
 sync_repo_local_kite_config() {
@@ -450,6 +564,11 @@ if [[ $dry_run -eq 1 ]]; then
     for asset in "${assets[@]}"; do
       if [[ -e "$target_dir/$asset" && $force -eq 1 ]]; then
         echo "  replace $asset"
+      elif [[ -e "$target_dir/$asset" ]] && asset_preserves_existing_by_default "$asset"; then
+        echo "  preserve $asset"
+        echo "  replace .devcontainer/bin/kite"
+        echo "  replace .devcontainer/kite-post-create.sh"
+        echo "  replace .devcontainer/README.kite.md"
       elif [[ -e "$target_dir/$asset" ]] && asset_merges_missing_by_default "$asset"; then
         echo "  merge   $asset"
       elif [[ -e "$target_dir/$asset" ]]; then
@@ -465,6 +584,13 @@ if [[ $dry_run -eq 1 ]]; then
         echo "  create  .kite"
       fi
     fi
+  fi
+  if [[ ! -f "$target_dir/.gitignore" ]]; then
+    echo "  create  .gitignore"
+  elif gitignore_has_required_entries "$target_dir/.gitignore"; then
+    echo "  skip    .gitignore (required Kite/Speckit entries present)"
+  else
+    echo "  merge   .gitignore (required Kite/Speckit entries)"
   fi
   if [[ $with_speckit -eq 1 ]]; then
     if has_speckit_templates && [[ $force_speckit_init -ne 1 ]]; then
@@ -489,7 +615,9 @@ if [[ $speckit_only -ne 1 ]]; then
   # Collect all conflicts before failing
   conflicts=()
   for asset in "${assets[@]}"; do
-    if [[ -e "$target_dir/$asset" && $force -ne 1 ]] && ! asset_merges_missing_by_default "$asset"; then
+    if [[ -e "$target_dir/$asset" && $force -ne 1 ]] \
+      && ! asset_merges_missing_by_default "$asset" \
+      && ! asset_preserves_existing_by_default "$asset"; then
       conflicts+=("$target_dir/$asset")
     fi
   done
@@ -502,6 +630,12 @@ if [[ $speckit_only -ne 1 ]]; then
 
   # Copy assets to target
   for asset in "${assets[@]}"; do
+    if [[ -e "$target_dir/$asset" && $force -ne 1 ]] && asset_preserves_existing_by_default "$asset"; then
+      preserved_existing_devcontainer=1
+      sync_existing_devcontainer_support_files "$source_root" "$target_dir"
+      continue
+    fi
+
     if asset_merges_missing_by_default "$asset" && [[ $force -ne 1 ]]; then
       if [[ -d "$source_root/$asset" ]]; then
         if [[ -d "$target_dir/$asset" ]]; then
@@ -525,6 +659,10 @@ if [[ $speckit_only -ne 1 ]]; then
   done
 
   sync_repo_local_kite_config "$source_root" "$target_dir"
+fi
+
+if [[ $speckit_only -ne 1 ]]; then
+  ensure_gitignore "$target_dir"
 fi
 
 if [[ $with_speckit -eq 1 ]]; then
@@ -552,6 +690,10 @@ else
 fi
 if [[ $with_speckit -eq 1 ]]; then
   echo "Spec Kit bootstrap completed with version target $speckit_version."
+fi
+if [[ $preserved_existing_devcontainer -eq 1 ]]; then
+  echo "Existing .devcontainer was preserved. Kite support files were refreshed in .devcontainer/bin/kite, .devcontainer/kite-post-create.sh, and .devcontainer/README.kite.md."
+  echo "After reopening in that container, run 'bash .devcontainer/kite-post-create.sh' if 'kite' is not yet on PATH, then run 'kite doctor .' to confirm the Kite container contract."
 fi
 if [[ $speckit_only -eq 0 ]]; then
   echo "Next: open the project in VS Code and run 'Dev Containers: Reopen in Container'."

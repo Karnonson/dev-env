@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bash-completion \
+        bubblewrap \
         build-essential \
         ca-certificates \
         curl \
@@ -16,46 +17,7 @@ RUN apt-get update \
         less \
         pkg-config \
         shellcheck \
+        socat \
         unzip \
         yamllint \
-    && rm -rf /var/lib/apt/lists/*
-
-FROM base AS python
-
-ENV DEVCONTAINER_PROFILE=python
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libffi-dev \
-        libpq-dev \
-        libssl-dev \
-        sqlite3 \
-    && rm -rf /var/lib/apt/lists/*
-
-FROM base AS typescript
-
-ENV DEVCONTAINER_PROFILE=typescript
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libgbm1 \
-        libgtk-3-0 \
-        libnss3 \
-        xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-FROM base AS fullstack
-
-ENV DEVCONTAINER_PROFILE=fullstack
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libffi-dev \
-        libpq-dev \
-        libssl-dev \
-        sqlite3 \
-        libgbm1 \
-        libgtk-3-0 \
-        libnss3 \
-        xdg-utils \
     && rm -rf /var/lib/apt/lists/*

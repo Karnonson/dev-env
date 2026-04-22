@@ -75,7 +75,6 @@ Workspace commands:
   status             Show whether workspace assets are current and whether Spec Kit is bootstrapped
 
 Project commands:
-  new <name>         Scaffold a new project with kite assets
   test               Detect stack and run the appropriate test suite
   audit              Run dependency audits and security checks
   release            Prepare or publish a gated release
@@ -89,11 +88,12 @@ Other:
   completion         Emit bash completion script
   help [command]     Show general or command-specific help
 
+Most day-to-day commands run inside the bundled base dev container.
+
 Common examples:
   kite install speckit .
   kite update workspace .
   kite update workspace --merge .
-  kite new my-app --with-speckit
   kite status .
   kite doctor .
   kite test .
@@ -259,38 +259,6 @@ Examples:
 EOF
 }
 
-new_help() {
-  cat <<EOF
-Usage:
-  kite new [options] <project-name>
-
-Scaffold a new project with kite assets.
-
-Options:
-  --template TYPE      Devcontainer profile: base, python, typescript, fullstack
-  --license ID         License choice to record in .kite/config.yml (default: MIT)
-  --deploy-target T    Deploy target to record in .kite/config.yml (default: none)
-  --test-tier T        Default test profile or tier to record in .kite/config.yml
-                       (default: standard)
-  --with-speckit       Also bootstrap the bundled Spec Kit setup
-  --speckit-version V  Pin the Spec Kit CLI version
-  --git-init-commit    Create an initial git commit after scaffolding
-  --repo OWNER/REPO    Download kite assets from a different repository
-  --ref REF            Download kite assets from a different ref
-  --source-dir PATH    Use a local kite checkout
-  -h, --help           Show this help text
-
-Behavior:
-  In interactive terminals, missing choice flags open guided pickers.
-  Selected choices are written to .kite/config.yml for later review.
-
-Examples:
-  kite new my-app
-  kite new my-app --template fullstack --license Apache-2.0 --deploy-target flyio --with-speckit
-  kite new my-app --git-init-commit
-EOF
-}
-
 release_help() {
   cat <<'EOF'
 Usage:
@@ -385,9 +353,11 @@ Designed for non-technical users and junior engineers. Each stage
 shows: what happens, who runs it, what artifact it produces, and
 what to do next.
 
+Default lifecycle:
+  feature start -> discover -> constitution -> specify -> design -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release
+
 Stages:
   discover     Idea and audience exploration (Strategist)
-  brief        Durable feature brief handoff
   constitution Project standards and non-negotiables
   specify      Requirements and acceptance criteria
   design       Visual direction and design system
@@ -403,7 +373,7 @@ Stages:
   learn        Post-release feedback capture
 
 Examples:
-  kite explain specify
+  kite explain discover
   kite explain plan
 EOF
 }
@@ -428,9 +398,6 @@ show_help() {
       ;;
     "audit")
       audit_help
-      ;;
-    "new")
-      new_help
       ;;
     "release")
       release_help
@@ -551,9 +518,9 @@ has_speckit_bootstrap() {
   local required_files=(
     .specify/presets/orchestrator-workflow/preset.yml
     .specify/presets/orchestrator-workflow/commands/speckit.discover.md
-    .specify/presets/orchestrator-workflow/commands/speckit.brief.md
     .specify/presets/orchestrator-workflow/commands/speckit.constitution.md
     .specify/presets/orchestrator-workflow/commands/speckit.design.md
+    .specify/presets/orchestrator-workflow/commands/speckit.plan.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
@@ -573,18 +540,74 @@ has_speckit_bootstrap() {
   return 0
 }
 
+devcontainer_brownfield_contract_files_present() {
+  local target_path="$1"
+  local required_path
+  local required_paths=(
+    devcontainer.json
+    bin/kite
+    kite-post-create.sh
+    README.kite.md
+  )
+
+  for required_path in "${required_paths[@]}"; do
+    if [[ ! -e "$target_path/$required_path" ]]; then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+devcontainer_brownfield_contract_matches_source() {
+  local source_path="$1"
+  local target_path="$2"
+
+  devcontainer_brownfield_contract_files_present "$target_path" || return 1
+
+  diff -q "$source_path/bin/kite" "$target_path/bin/kite" >/dev/null 2>&1 || return 1
+  diff -q "$source_path/post-create.sh" "$target_path/kite-post-create.sh" >/dev/null 2>&1 || return 1
+  diff -q "$source_path/README.md" "$target_path/README.kite.md" >/dev/null 2>&1 || return 1
+
+  return 0
+}
+
+merge_missing_tree_contract_matches_source() {
+  local source_path="$1"
+  local target_path="$2"
+  local source_entry rel_path
+
+  while IFS= read -r -d '' source_entry; do
+    rel_path="${source_entry#"$source_path"/}"
+    if [[ ! -e "$target_path/$rel_path" ]]; then
+      return 1
+    fi
+  done < <(find "$source_path" -mindepth 1 -print0)
+
+  return 0
+}
+
 asset_matches_source() {
   local asset="$1"
   local source_path="$2"
   local target_path="$3"
 
-  # File-level asset: use diff -q (not -r)
-  if [[ -f "$source_path" ]]; then
-    diff -q "$source_path" "$target_path" >/dev/null 2>&1
-    return
-  fi
-
   case "$asset" in
+    .devcontainer)
+      if diff -qr "$source_path" "$target_path" >/dev/null 2>&1; then
+        return 0
+      fi
+      devcontainer_brownfield_contract_matches_source "$source_path" "$target_path"
+      return
+      ;;
+    .github/prompts|.github/agents|.github/instructions|docs/errors)
+      merge_missing_tree_contract_matches_source "$source_path" "$target_path"
+      return
+      ;;
+    .github/copilot-instructions.md)
+      [[ -f "$target_path" ]]
+      return
+      ;;
     .github/agents)
       diff -qr --exclude='speckit.*.agent.md' "$source_path" "$target_path" >/dev/null 2>&1
       ;;
@@ -592,6 +615,11 @@ asset_matches_source() {
       diff -qr --exclude='speckit.*.prompt.md' "$source_path" "$target_path" >/dev/null 2>&1
       ;;
     *)
+      # File-level asset: use diff -q (not -r)
+      if [[ -f "$source_path" ]]; then
+        diff -q "$source_path" "$target_path" >/dev/null 2>&1
+        return
+      fi
       diff -qr "$source_path" "$target_path" >/dev/null 2>&1
       ;;
   esac
@@ -663,8 +691,15 @@ build_kite_command() {
 build_post_create_command() {
   local script_path="$target_dir/.devcontainer/post-create.sh"
 
+  if [[ -f "$target_dir/.devcontainer/kite-post-create.sh" ]]; then
+    script_path="$target_dir/.devcontainer/kite-post-create.sh"
+  fi
+
   if [[ "$target_dir" == "$PWD" ]]; then
     script_path=".devcontainer/post-create.sh"
+    if [[ -f "$target_dir/.devcontainer/kite-post-create.sh" ]]; then
+      script_path=".devcontainer/kite-post-create.sh"
+    fi
   fi
 
   shell_join bash "$script_path"
@@ -753,10 +788,9 @@ prompt_choice() {
 
 write_kite_config() {
   local target="$1"
-  local template="$2"
-  local license="$3"
-  local deploy_target="$4"
-  local test_tier="$5"
+  local license="$2"
+  local deploy_target="$3"
+  local test_tier="$4"
 
   mkdir -p "$target/.kite"
   cat > "$target/.kite/config.yml" <<EOF
@@ -764,7 +798,7 @@ write_kite_config() {
 schema_version: 1
 
 scaffold:
-  template: $template
+  template: base
   license: $license
 
 workflow:
@@ -1667,13 +1701,14 @@ run_feature_status() {
     if [[ "$as_json" -eq 1 ]]; then
       printf '{"status":"no-active-feature","branch":%s,"hint":%s}\n' \
         "$(json_escape "$branch")" \
-        "$(json_escape "Run kite install speckit . then /speckit.discover \"your feature idea\" to start a feature")"
+        "$(json_escape "Run kite install speckit ., align the feature branch and .specify/feature.json, then /speckit.discover \"your feature idea\".")"
     else
       echo "No active Speckit feature detected."
       echo ""
       echo "Hints:"
       echo "  - Current branch: ${branch:-<none>}"
       echo "  - Run: kite install speckit ."
+      echo "  - Align the feature branch and .specify/feature.json"
       echo "  - Then: /speckit.discover \"your feature idea\""
     fi
     return 0
@@ -1685,7 +1720,6 @@ run_feature_status() {
   # Order matters: it drives the "current stage" detection.
   artifact_labels=(
     "discover"
-    "brief"
     "constitution"
     "specify"
     "design"
@@ -1700,7 +1734,6 @@ run_feature_status() {
   )
   artifact_paths=(
     "$feature_dir/discovery.md"
-    "$feature_dir/brief.md"
     "$target_dir/.specify/memory/constitution.md"
     "$feature_dir/spec.md"
     "$target_dir/.specify/memory/design-direction.md"
@@ -1730,8 +1763,7 @@ run_feature_status() {
   # Pick next action from the first pending artifact.
   if (( ${#pending_labels[@]} > 0 )); then
     case "${pending_labels[0]}" in
-      discover)     next_action="Capture discovery for the feature"; next_command="/speckit.discover" ;;
-      brief)        next_action="Draft a feature brief";          next_command="/speckit.brief" ;;
+      discover)     next_action="Align feature context, then capture discovery for the feature"; next_command="/speckit.discover" ;;
       constitution) next_action="Lock project standards";          next_command="/speckit.constitution" ;;
       specify)      next_action="Write the feature spec";          next_command="/speckit.specify" ;;
       design)       next_action="Define design direction";         next_command="Designer agent or /speckit.design" ;;
@@ -1860,26 +1892,6 @@ Who runs it:
 What comes out:
   specs/<feature>/discovery.md and, when needed,
   specs/<feature>/market-validation.md.
-
-Next:
-  /speckit.brief — turns the approved discovery artifact into a
-  stakeholder-friendly product brief.
-EOF
-      ;;
-    brief)
-      cat <<'EOF'
-Stage: brief
-
-What it is:
-  A plain-language product brief that stakeholders can read and approve
-  before technical specification starts.
-
-Who writes it:
-  /speckit.brief using the approved discovery artifact.
-
-What comes out:
-  specs/<feature>/brief.md with problem, user, value, scope,
-  success metric, and non-goals.
 
 Next:
   /speckit.constitution, then /speckit.specify.
@@ -2131,200 +2143,6 @@ EOF
       return 1
       ;;
   esac
-}
-
-run_new() {
-  local git_init_commit=0
-  local project_dir
-  local project_name=""
-  local template="base"
-  local license="MIT"
-  local deploy_target="none"
-  local test_tier="standard"
-  local new_with_speckit=0
-  local template_set=0
-  local license_set=0
-  local deploy_target_set=0
-  local test_tier_set=0
-
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --template)
-        template="${2:?Missing value for --template}"
-        template_set=1
-        shift 2
-        ;;
-      --license)
-        license="${2:?Missing value for --license}"
-        license_set=1
-        shift 2
-        ;;
-      --deploy-target)
-        deploy_target="${2:?Missing value for --deploy-target}"
-        deploy_target_set=1
-        shift 2
-        ;;
-      --test-tier)
-        test_tier="${2:?Missing value for --test-tier}"
-        test_tier_set=1
-        shift 2
-        ;;
-      --with-speckit)
-        new_with_speckit=1
-        shift
-        ;;
-      --speckit-version)
-        speckit_version="${2:?Missing value for --speckit-version}"
-        shift 2
-        ;;
-      --repo)
-        repo="${2:?Missing value for --repo}"
-        shift 2
-        ;;
-      --ref)
-        ref="${2:?Missing value for --ref}"
-        shift 2
-        ;;
-      --source-dir)
-        source_dir="${2:?Missing value for --source-dir}"
-        shift 2
-        ;;
-      --git-init-commit)
-        git_init_commit=1
-        shift
-        ;;
-      -h|--help)
-        new_help
-        return 0
-        ;;
-      -*)
-        echo "Unknown option: $1" >&2
-        new_help >&2
-        return 1
-        ;;
-      *)
-        project_name="$1"
-        shift
-        ;;
-    esac
-  done
-
-  if [[ -z "$project_name" ]]; then
-    echo "Project name is required" >&2
-    new_help >&2
-    return 1
-  fi
-
-  project_dir="$(pwd)/$project_name"
-
-  if [[ -d "$project_dir" ]]; then
-    echo "Directory already exists: $project_dir" >&2
-    return 1
-  fi
-
-  if [[ $template_set -ne 1 ]]; then
-    prompt_choice template "Choose a devcontainer profile:" "$template" \
-      "base|Base|Minimal workspace shell and repo tooling" \
-      "python|Python|Python-first tooling and runtime" \
-      "typescript|TypeScript|Node.js and TypeScript focused tooling" \
-      "fullstack|Fullstack|Python plus TypeScript in one container"
-  fi
-
-  if [[ $license_set -ne 1 ]]; then
-    prompt_choice license "Choose the default project license to record:" "$license" \
-      "MIT|MIT|Permissive default for most starter projects" \
-      "Apache-2.0|Apache-2.0|Permissive with explicit patent grant" \
-      "GPL-3.0-only|GPL-3.0-only|Strong copyleft for shared derivatives" \
-      "UNLICENSED|UNLICENSED|Private repo default with no public license grant"
-  fi
-
-  if [[ $deploy_target_set -ne 1 ]]; then
-    prompt_choice deploy_target "Choose the default deploy target to record:" "$deploy_target" \
-      "none|None|Decide later without committing to a platform" \
-      "flyio|Fly.io|Good default for small fullstack apps" \
-      "railway|Railway|Managed deploy flow with low setup overhead" \
-      "render|Render|Simple managed services and static sites" \
-      "vercel|Vercel|Frontend-heavy deployments and edge routing" \
-      "aws|AWS|Most flexible option with the highest setup cost"
-  fi
-
-  if [[ $test_tier_set -ne 1 ]]; then
-    prompt_choice test_tier "Choose the default verification profile to record:" "$test_tier" \
-      "smoke|Smoke|Fast confidence checks before bigger changes" \
-      "standard|Standard|Balanced default for day-to-day feature work" \
-      "full|Full|Heavier verification before release or risky refactors"
-  fi
-
-  validate_choice "template" "$template" base python typescript fullstack || return 1
-  validate_choice "license" "$license" MIT Apache-2.0 GPL-3.0-only UNLICENSED || return 1
-  validate_choice "deploy target" "$deploy_target" none flyio railway render vercel aws || return 1
-  validate_choice "test tier" "$test_tier" smoke standard full unit integration e2e a11y perf security all || return 1
-
-  echo "Scaffolding $project_name..."
-  mkdir -p "$project_dir"
-  git -C "$project_dir" init --quiet
-
-  cat > "$project_dir/.gitignore" << 'HEREDOC'
-node_modules/
-.venv/
-__pycache__/
-*.pyc
-*.pyo
-*.egg-info/
-.env
-.env.local
-!.env.example
-.idea/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
-coverage/
-htmlcov/
-.pytest_cache/
-.specify/cache/
-HEREDOC
-
-  local -a install_args=()
-  if [[ $new_with_speckit -eq 1 ]]; then
-    install_args+=(--with-speckit)
-  fi
-  if [[ -n "$speckit_version" ]]; then
-    install_args+=(--speckit-version "$speckit_version")
-  fi
-  if [[ -n "$source_dir" ]]; then
-    install_args+=(--source-dir "$source_dir")
-  else
-    install_args+=(--repo "$repo" --ref "$ref")
-  fi
-  install_args+=("$project_dir")
-
-  if [[ -n "$source_dir" ]]; then
-    bash "$source_dir/install.sh" "${install_args[@]}"
-  else
-    require_command curl
-    curl -fsSL "https://raw.githubusercontent.com/${repo}/${ref}/install.sh" | bash -s -- "${install_args[@]}"
-  fi
-
-  if [[ "$template" != "base" && -f "$project_dir/.devcontainer/switch-profile.sh" ]]; then
-    bash "$project_dir/.devcontainer/switch-profile.sh" "$template"
-  fi
-
-  write_kite_config "$project_dir" "$template" "$license" "$deploy_target" "$test_tier"
-
-  if [[ $git_init_commit -eq 1 ]]; then
-    git -C "$project_dir" add .
-    git -C "$project_dir" -c user.name='kite' -c user.email='kite@local' commit -m 'chore: scaffold project with kite' --allow-empty >/dev/null
-  fi
-
-  echo ""
-  echo "Project scaffolded at $project_dir"
-  echo "Saved workflow defaults to $project_dir/.kite/config.yml"
-  echo ""
-  echo "Next steps:"
-  echo "  cd $project_name"
-  echo "  code ."
-  echo "  # Then: Dev Containers: Reopen in Container"
 }
 
 bump_version() {
@@ -2845,11 +2663,11 @@ _kite_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local commands="install update doctor status new test audit release verify feature explain completion help"
+  local commands="install update doctor status test audit release verify feature explain completion help"
   local install_sub="speckit"
   local update_sub="workspace"
   local verify_sub="feature"
-  local explain_stages="discover brief constitution specify design plan tasks analyze implement test review verify release operate learn"
+  local explain_stages="discover constitution specify design plan tasks analyze implement test review verify release operate learn"
   local update_options="--merge --dry-run --with-speckit --force-speckit-init --speckit-version --repo --ref --source-dir -h --help"
   local install_options="--force-speckit-init --speckit-version --repo --ref --source-dir -h --help"
   local doctor_options="--speckit-version --repo --ref --source-dir -h --help"
@@ -2857,7 +2675,6 @@ _kite_completion() {
   local feature_options="--json -h --help"
   local test_options="--tier --profile --test-tier --e2e -h --help"
   local audit_options="--fix -h --help"
-  local new_options="--template --license --deploy-target --test-tier --with-speckit --speckit-version --git-init-commit --repo --ref --source-dir -h --help"
   local release_subcommands="prepare publish"
   local release_options="--bump --dry-run --confirm --skip-checks -h --help"
 
@@ -2899,7 +2716,6 @@ _kite_completion() {
       ;;
     test) COMPREPLY=($(compgen -W "$test_options" -- "$cur")) ;;
     audit) COMPREPLY=($(compgen -W "$audit_options" -- "$cur")) ;;
-    new) COMPREPLY=($(compgen -W "$new_options" -- "$cur")) ;;
     release)
       if [[ $cword -eq 2 ]]; then
         COMPREPLY=($(compgen -W "$release_subcommands $release_options" -- "$cur"))
@@ -3212,9 +3028,6 @@ parse_help_target() {
     "audit")
       show_help "audit"
       ;;
-    "new")
-      show_help "new"
-      ;;
     "release"|"release prepare"|"release publish")
       show_help "release"
       ;;
@@ -3279,10 +3092,6 @@ main() {
       mode="status"
       shift 1
       ;;
-    new)
-      mode="new"
-      shift 1
-      ;;
     test|audit|release)
       mode="$primary_command"
       shift 1
@@ -3314,11 +3123,6 @@ main() {
       exit 1
       ;;
   esac
-
-  if [[ "$mode" == "new" ]]; then
-    run_new "$@"
-    exit $?
-  fi
 
   # Commands that handle their own argument parsing
   if [[ "$mode" == "test" || "$mode" == "audit" || "$mode" == "release" || "$mode" == "verify-feature" ]]; then

@@ -4,13 +4,13 @@ preset:
   id: "orchestrator-workflow"
   name: "Orchestrator Workflow"
   version: "1.1.0"
-  description: "Design-aware Speckit customization with discovery and brief stages, question-first constitution setup, and split implementation guidance."
+  description: "Design-aware Speckit customization with discovery, constitution, design, plan, and split implementation guidance."
   author: "Karnon"
   repository: "https://github.com/Karnonson/kite"
   license: "MIT"
 
 requires:
-  speckit_version: ">=0.6.0"
+  speckit_version: ">=0.7.0"
 
 provides:
   templates:
@@ -18,11 +18,6 @@ provides:
       name: "speckit.discover"
       file: "commands/speckit.discover.md"
       description: "Guide front-of-lifecycle discovery and optionally validate market risk before specification"
-
-    - type: "command"
-      name: "speckit.brief"
-      file: "commands/speckit.brief.md"
-      description: "Write a plain-language product brief before constitution and specification"
 
     - type: "command"
       name: "speckit.constitution"
@@ -33,7 +28,12 @@ provides:
     - type: "command"
       name: "speckit.design"
       file: "commands/speckit.design.md"
-      description: "Capture UI and design-system direction before feature specification"
+      description: "Capture UI and design-system direction after specification and before planning"
+
+    - type: "command"
+      name: "speckit.plan"
+      file: "commands/speckit.plan.md"
+      description: "Turn the approved specification and design direction into the canonical implementation plan"
 
     - type: "command"
       name: "speckit.implement"
