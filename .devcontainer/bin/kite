@@ -213,18 +213,23 @@ test_help() {
 Usage:
   kite test [options] [target-directory]
 
-Detect project stack and run the appropriate test suite.
+Detect project stack, resolve the configured verification profile, and run the matching test tiers.
 
 Options:
-  --e2e                Also run Playwright end-to-end tests
+  --tier T            Run a specific tier: unit, integration, e2e, a11y, perf, security
+                      Repeatable. Use --tier all for the full matrix.
+  --profile P         Expand a saved profile: smoke, standard, or full
+  --e2e               Backward-compatible alias for --tier e2e
   -h, --help           Show this help text
 
 Monorepo support:
-  Automatically discovers subprojects (backend/, frontend/, packages/*)
-  and runs tests per detected stack.
+  Automatically discovers root projects, common app folders, package-manager
+  workspaces, and packages/* style subprojects.
 
 Examples:
   kite test .
+  kite test --tier integration .
+  kite test --profile full .
   kite test --e2e .
 EOF
 }
@@ -265,7 +270,8 @@ Options:
   --template TYPE      Devcontainer profile: base, python, typescript, fullstack
   --license ID         License choice to record in .kite/config.yml (default: MIT)
   --deploy-target T    Deploy target to record in .kite/config.yml (default: none)
-  --test-tier T        Default test tier to record in .kite/config.yml (default: standard)
+  --test-tier T        Default test profile or tier to record in .kite/config.yml
+                       (default: standard)
   --with-speckit       Also bootstrap the bundled Spec Kit setup
   --speckit-version V  Pin the Spec Kit CLI version
   --git-init-commit    Create an initial git commit after scaffolding
@@ -835,16 +841,112 @@ detect_stack() {
   fi
 }
 
+read_kite_test_profile() {
+  local config_file="$1/.kite/config.yml"
+  local configured_value=""
+
+  if [[ -f "$config_file" ]]; then
+    configured_value="$(awk '
+      /^[[:space:]]*workflow:[[:space:]]*$/ { in_workflow = 1; next }
+      in_workflow && /^[^[:space:]]/ { in_workflow = 0 }
+      in_workflow && /^[[:space:]]*test_tier:[[:space:]]*/ {
+        sub(/^[[:space:]]*test_tier:[[:space:]]*/, "", $0)
+        gsub(/["'"'"'[:space:]]/, "", $0)
+        print $0
+        exit
+      }
+    ' "$config_file")"
+  fi
+
+  if [[ -n "$configured_value" ]]; then
+    printf '%s\n' "$configured_value"
+  else
+    printf 'standard\n'
+  fi
+}
+
+expand_test_profile() {
+  case "$1" in
+    smoke)
+      printf 'unit\n'
+      ;;
+    standard)
+      printf 'unit\nintegration\n'
+      ;;
+    full|all)
+      printf 'unit\nintegration\ne2e\na11y\nperf\nsecurity\n'
+      ;;
+    unit|integration|e2e|a11y|perf|security)
+      printf '%s\n' "$1"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+project_has_manifest() {
+  local target="$1"
+
+  [[ -d "$target" ]] || return 1
+  [[ -f "$target/package.json" || -f "$target/pyproject.toml" || -f "$target/setup.py" || -f "$target/setup.cfg" || -f "$target/requirements.txt" || -f "$target/Pipfile" ]]
+}
+
+discover_workspace_patterns() {
+  local target="$1"
+
+  if [[ -f "$target/package.json" ]]; then
+    if command -v jq >/dev/null 2>&1; then
+      jq -r 'if (.workspaces | type) == "array" then .workspaces[] elif (.workspaces.packages | type) == "array" then .workspaces.packages[] else empty end' "$target/package.json" 2>/dev/null || true
+    else
+      node -e 'try { const pkg = require(process.argv[1]); const workspaces = Array.isArray(pkg.workspaces) ? pkg.workspaces : (pkg.workspaces && Array.isArray(pkg.workspaces.packages) ? pkg.workspaces.packages : []); for (const pattern of workspaces) console.log(pattern); } catch (error) {}' "$target/package.json" 2>/dev/null || true
+    fi
+  fi
+
+  if [[ -f "$target/pnpm-workspace.yaml" ]]; then
+    awk '
+      /^[[:space:]]*packages:[[:space:]]*$/ { in_packages = 1; next }
+      in_packages && /^[^[:space:]-]/ { in_packages = 0 }
+      in_packages && /^[[:space:]]*-[[:space:]]*/ {
+        sub(/^[[:space:]]*-[[:space:]]*/, "", $0)
+        gsub(/["'"'"']/, "", $0)
+        print $0
+      }
+    ' "$target/pnpm-workspace.yaml"
+  fi
+}
+
 discover_project_roots() {
   local target="$1"
   local -a roots=()
   local candidate
+  local pattern
+  local canonical_candidate
+  local -A seen=()
 
-  for candidate in "$target"/backend "$target"/api "$target"/server "$target"/frontend "$target"/web "$target"/app "$target"/packages/*; do
-    if [[ -d "$candidate" ]] && { [[ -f "$candidate/pyproject.toml" ]] || [[ -f "$candidate/package.json" ]] || [[ -f "$candidate/setup.py" ]] || [[ -f "$candidate/requirements.txt" ]]; }; then
-      roots+=("$candidate")
+  add_project_root() {
+    local candidate_path="$1"
+
+    project_has_manifest "$candidate_path" || return 0
+    canonical_candidate="$(cd "$candidate_path" 2>/dev/null && pwd -P)" || return 0
+    if [[ -z "${seen[$canonical_candidate]:-}" ]]; then
+      roots+=("$canonical_candidate")
+      seen["$canonical_candidate"]=1
     fi
+  }
+
+  add_project_root "$target"
+
+  for candidate in "$target"/backend "$target"/api "$target"/server "$target"/frontend "$target"/web "$target"/app "$target"/apps/* "$target"/services/* "$target"/libs/* "$target"/packages/*; do
+    add_project_root "$candidate"
   done
+
+  while IFS= read -r pattern; do
+    [[ -n "$pattern" ]] || continue
+    while IFS= read -r candidate; do
+      add_project_root "$candidate"
+    done < <(compgen -G "$target/$pattern" || true)
+  done < <(discover_workspace_patterns "$target")
 
   if [[ ${#roots[@]} -eq 0 ]]; then
     roots=("$target")
@@ -853,92 +955,413 @@ discover_project_roots() {
   printf '%s\n' "${roots[@]}"
 }
 
+python_tests_exist() {
+  local project_root="$1"
+
+  [[ -f "$project_root/pytest.ini" || -f "$project_root/pyproject.toml" || -f "$project_root/setup.cfg" ]] \
+    || find "$project_root" -maxdepth 3 \( -name 'test_*.py' -o -name '*_test.py' \) -print -quit 2>/dev/null | grep -q .
+}
+
+first_existing_path() {
+  local candidate
+
+  for candidate in "$@"; do
+    if [[ -e "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+first_glob_match() {
+  local pattern
+  local match
+
+  for pattern in "$@"; do
+    match="$(compgen -G "$pattern" | head -n 1 || true)"
+    if [[ -n "$match" ]]; then
+      printf '%s\n' "$match"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+package_has_script() {
+  local project_root="$1"
+  local script_name="$2"
+
+  [[ -f "$project_root/package.json" ]] || return 1
+
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg script_name "$script_name" '.scripts[$script_name] != null' "$project_root/package.json" >/dev/null 2>&1
+  else
+    node -e 'try { const pkg = require(process.argv[1]); process.exit(pkg.scripts && Object.prototype.hasOwnProperty.call(pkg.scripts, process.argv[2]) ? 0 : 1); } catch (error) { process.exit(1); }' "$project_root/package.json" "$script_name" >/dev/null 2>&1
+  fi
+}
+
+run_package_script() {
+  local project_root="$1"
+  local script_name="$2"
+
+  if command -v pnpm >/dev/null 2>&1 && [[ -f "$project_root/pnpm-lock.yaml" ]]; then
+    (cd "$project_root" && pnpm run "$script_name")
+  elif command -v npm >/dev/null 2>&1; then
+    (cd "$project_root" && npm run "$script_name")
+  else
+    echo "[warn] No Node.js package runner found for $script_name" >&2
+    return 1
+  fi
+}
+
+run_python_pytest() {
+  local project_root="$1"
+  shift
+
+  if command -v uv >/dev/null 2>&1; then
+    (cd "$project_root" && uv run pytest -v "$@")
+  elif [[ -f "$project_root/.venv/bin/pytest" ]]; then
+    (cd "$project_root" && .venv/bin/pytest -v "$@")
+  elif command -v pytest >/dev/null 2>&1; then
+    (cd "$project_root" && pytest -v "$@")
+  else
+    echo "[warn] No Python test runner found (pytest). Install with: uv add --dev pytest"
+    return 1
+  fi
+}
+
+make_target_exists() {
+  local project_root="$1"
+  local target_name="$2"
+
+  [[ -f "$project_root/Makefile" ]] && grep -Eq "^${target_name}:" "$project_root/Makefile"
+}
+
+run_test_tier_for_root() {
+  local tier="$1"
+  local project_root="$2"
+  local stack="$3"
+  local result_var="$4"
+  local ran=0
+  local config_path=""
+  local test_path=""
+
+  printf -v "$result_var" '%s' 0
+
+  case "$tier" in
+    unit)
+      case "$stack" in
+        python|fullstack)
+          if python_tests_exist "$project_root"; then
+            ran=1
+            echo "Running Python unit tests..."
+            run_python_pytest "$project_root" || return 1
+          fi
+          ;;&
+        typescript|fullstack)
+          if [[ -f "$project_root/package.json" ]]; then
+            if package_has_script "$project_root" "test:unit"; then
+              ran=1
+              echo "Running TypeScript/JavaScript unit tests..."
+              run_package_script "$project_root" "test:unit" || return 1
+            elif package_has_script "$project_root" "test"; then
+              ran=1
+              echo "Running TypeScript/JavaScript tests..."
+              run_package_script "$project_root" "test" || return 1
+            else
+              config_path="$(first_glob_match "$project_root/vitest.config.*" "$project_root/jest.config.*" || true)"
+              if [[ -n "$config_path" ]]; then
+                ran=1
+                case "$config_path" in
+                  *vitest*)
+                    echo "Running vitest..."
+                    (cd "$project_root" && npx vitest run --config "$config_path") || return 1
+                    ;;
+                  *jest*)
+                    echo "Running jest..."
+                    (cd "$project_root" && npx jest --config "$config_path") || return 1
+                    ;;
+                esac
+              fi
+            fi
+          fi
+          ;;&
+        unknown)
+          if make_target_exists "$project_root" "test"; then
+            ran=1
+            echo "Running make test..."
+            (cd "$project_root" && make test) || return 1
+          fi
+          ;;
+      esac
+      ;;
+    integration)
+      case "$stack" in
+        python|fullstack)
+          test_path="$(first_existing_path "$project_root/tests/integration" "$project_root/integration" "$project_root/test/integration" || true)"
+          if [[ -n "$test_path" ]]; then
+            ran=1
+            echo "Running Python integration tests..."
+            run_python_pytest "$project_root" "$test_path" || return 1
+          fi
+          ;;&
+        typescript|fullstack)
+          if [[ -f "$project_root/package.json" ]]; then
+            if package_has_script "$project_root" "test:integration"; then
+              ran=1
+              echo "Running TypeScript/JavaScript integration tests..."
+              run_package_script "$project_root" "test:integration" || return 1
+            else
+              config_path="$(first_glob_match "$project_root/vitest.integration.config.*" "$project_root/jest.integration.config.*" || true)"
+              if [[ -n "$config_path" ]]; then
+                ran=1
+                case "$config_path" in
+                  *vitest*)
+                    echo "Running vitest integration suite..."
+                    (cd "$project_root" && npx vitest run --config "$config_path") || return 1
+                    ;;
+                  *jest*)
+                    echo "Running jest integration suite..."
+                    (cd "$project_root" && npx jest --config "$config_path") || return 1
+                    ;;
+                esac
+              fi
+            fi
+          fi
+          ;;&
+        unknown)
+          if make_target_exists "$project_root" "integration-test"; then
+            ran=1
+            echo "Running make integration-test..."
+            (cd "$project_root" && make integration-test) || return 1
+          elif make_target_exists "$project_root" "test-integration"; then
+            ran=1
+            echo "Running make test-integration..."
+            (cd "$project_root" && make test-integration) || return 1
+          fi
+          ;;
+      esac
+      ;;
+    e2e)
+      if [[ -f "$project_root/package.json" ]] && package_has_script "$project_root" "test:e2e"; then
+        ran=1
+        echo "Running end-to-end tests..."
+        run_package_script "$project_root" "test:e2e" || return 1
+      elif [[ -f "$project_root/package.json" ]] && package_has_script "$project_root" "e2e"; then
+        ran=1
+        echo "Running end-to-end tests..."
+        run_package_script "$project_root" "e2e" || return 1
+      else
+        config_path="$(first_glob_match "$project_root/playwright.config.ts" "$project_root/playwright.config.js" || true)"
+        if [[ -n "$config_path" ]]; then
+          ran=1
+          echo "Running Playwright E2E tests..."
+          (cd "$project_root" && npx playwright test) || return 1
+        fi
+      fi
+      ;;
+    a11y)
+      if [[ -f "$project_root/package.json" ]] && package_has_script "$project_root" "test:a11y"; then
+        ran=1
+        echo "Running accessibility checks..."
+        run_package_script "$project_root" "test:a11y" || return 1
+      elif [[ -f "$project_root/package.json" ]] && package_has_script "$project_root" "a11y"; then
+        ran=1
+        echo "Running accessibility checks..."
+        run_package_script "$project_root" "a11y" || return 1
+      elif [[ -f "$project_root/package.json" ]] && package_has_script "$project_root" "test:accessibility"; then
+        ran=1
+        echo "Running accessibility checks..."
+        run_package_script "$project_root" "test:accessibility" || return 1
+      fi
+      ;;
+    perf)
+      case "$stack" in
+        python|fullstack)
+          test_path="$(first_existing_path "$project_root/tests/perf" "$project_root/tests/performance" "$project_root/perf" || true)"
+          if [[ -n "$test_path" ]]; then
+            ran=1
+            echo "Running Python performance checks..."
+            run_python_pytest "$project_root" "$test_path" || return 1
+          fi
+          ;;&
+        typescript|fullstack)
+          if [[ -f "$project_root/package.json" ]] && package_has_script "$project_root" "test:perf"; then
+            ran=1
+            echo "Running performance checks..."
+            run_package_script "$project_root" "test:perf" || return 1
+          elif [[ -f "$project_root/package.json" ]] && package_has_script "$project_root" "perf"; then
+            ran=1
+            echo "Running performance checks..."
+            run_package_script "$project_root" "perf" || return 1
+          fi
+          ;;&
+        unknown)
+          if make_target_exists "$project_root" "perf-test"; then
+            ran=1
+            echo "Running make perf-test..."
+            (cd "$project_root" && make perf-test) || return 1
+          elif make_target_exists "$project_root" "test-perf"; then
+            ran=1
+            echo "Running make test-perf..."
+            (cd "$project_root" && make test-perf) || return 1
+          fi
+          ;;
+      esac
+      ;;
+    *)
+      echo "[warn] Unsupported test tier: $tier"
+      return 1
+      ;;
+  esac
+
+  printf -v "$result_var" '%s' "$ran"
+  return 0
+}
+
 run_test() {
-  local stack run_e2e=0 exit_code=0
+  local stack exit_code=0
+  local configured_profile=""
+  local selected_profile=""
+  local resolved_profile_label=""
+  local requested_tier=""
+  local tier_ran=0
+  local tier_ran_any=0
+  local any_tier_ran=0
+  local root_label=""
+  local -a requested_tiers=()
+  local -a selected_tiers=()
+  local -a project_roots=()
+  local -A seen_tiers=()
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --e2e) run_e2e=1; shift ;;
+      --tier)
+        requested_tier="${2:?Missing value for --tier}"
+        if ! expand_test_profile "$requested_tier" >/dev/null 2>&1; then
+          echo "Unsupported test tier: $requested_tier" >&2
+          echo "Allowed values: unit integration e2e a11y perf security all" >&2
+          return 1
+        fi
+        requested_tiers+=("$requested_tier")
+        shift 2
+        ;;
+      --profile|--test-tier)
+        selected_profile="${2:?Missing value for $1}"
+        if ! expand_test_profile "$selected_profile" >/dev/null 2>&1; then
+          echo "Unsupported test profile: $selected_profile" >&2
+          echo "Allowed values: smoke standard full unit integration e2e a11y perf security all" >&2
+          return 1
+        fi
+        shift 2
+        ;;
+      --e2e)
+        requested_tiers+=("e2e")
+        shift
+        ;;
       *) break ;;
     esac
   done
+
+  configured_profile="$(read_kite_test_profile "$target_dir")"
+  if ! expand_test_profile "$configured_profile" >/dev/null 2>&1; then
+    echo "[warn] Unsupported workflow.test_tier '$configured_profile' in .kite/config.yml; falling back to standard"
+    configured_profile="standard"
+  fi
+
+  if [[ ${#requested_tiers[@]} -eq 0 ]]; then
+    if [[ -z "$selected_profile" ]]; then
+      selected_profile="$configured_profile"
+    fi
+    resolved_profile_label="$selected_profile"
+
+    while IFS= read -r requested_tier; do
+      [[ -n "$requested_tier" ]] || continue
+      if [[ -z "${seen_tiers[$requested_tier]:-}" ]]; then
+        selected_tiers+=("$requested_tier")
+        seen_tiers["$requested_tier"]=1
+      fi
+    done < <(expand_test_profile "$selected_profile")
+  else
+    if [[ -n "$selected_profile" ]]; then
+      resolved_profile_label="$selected_profile + explicit tiers"
+      while IFS= read -r requested_tier; do
+        [[ -n "$requested_tier" ]] || continue
+        if [[ -z "${seen_tiers[$requested_tier]:-}" ]]; then
+          selected_tiers+=("$requested_tier")
+          seen_tiers["$requested_tier"]=1
+        fi
+      done < <(expand_test_profile "$selected_profile")
+    else
+      resolved_profile_label="explicit tiers"
+    fi
+
+    for requested_tier in "${requested_tiers[@]}"; do
+      while IFS= read -r stack; do
+        [[ -n "$stack" ]] || continue
+        if [[ -z "${seen_tiers[$stack]:-}" ]]; then
+          selected_tiers+=("$stack")
+          seen_tiers["$stack"]=1
+        fi
+      done < <(expand_test_profile "$requested_tier")
+    done
+  fi
 
   local -a project_roots=()
   while IFS= read -r root; do
     project_roots+=("$root")
   done < <(discover_project_roots "$target_dir")
 
-  for project_root in "${project_roots[@]}"; do
-    stack="$(detect_stack "$project_root")"
-    local root_label="${project_root#"$target_dir"}"
-    root_label="${root_label:-/}"
-    echo "Test target: $project_root ($root_label)"
-    echo "Detected stack: $stack"
-    echo ""
+  echo "Test target: $target_dir"
+  echo "Resolved test profile: $resolved_profile_label"
+  echo "Selected tiers: ${selected_tiers[*]}"
+  echo ""
 
-    case "$stack" in
-      python|fullstack)
-        if [[ -f "$project_root/pyproject.toml" ]] || find "$project_root" -maxdepth 3 \( -name 'test_*.py' -o -name '*_test.py' \) -print -quit 2>/dev/null | grep -q .; then
-          echo "Running Python tests..."
-          if command -v uv >/dev/null 2>&1; then
-            (cd "$project_root" && uv run pytest -v) || exit_code=1
-          elif [[ -f "$project_root/.venv/bin/pytest" ]]; then
-            (cd "$project_root" && .venv/bin/pytest -v) || exit_code=1
-          elif command -v pytest >/dev/null 2>&1; then
-            (cd "$project_root" && pytest -v) || exit_code=1
-          else
-            echo "[warn] No Python test runner found (pytest). Install with: uv add --dev pytest"
-            exit_code=1
-          fi
-        fi
-        ;;&
-      typescript|fullstack)
-        if [[ -f "$project_root/package.json" ]]; then
-          local test_script="no"
-          if command -v jq >/dev/null 2>&1; then
-            test_script="$(jq -r 'if .scripts.test then "yes" else "no" end' "$project_root/package.json" 2>/dev/null || echo "no")"
-          else
-            test_script="$(node -e "try{var p=require(process.argv[1]);console.log(p.scripts&&p.scripts.test?'yes':'no')}catch(e){console.log('no')}" "$project_root/package.json" 2>/dev/null || echo "no")"
-          fi
+  for requested_tier in "${selected_tiers[@]}"; do
+    if [[ "$requested_tier" == "security" ]]; then
+      echo "=== Tier: security ==="
+      if ! run_audit; then
+        exit_code=1
+      fi
+      any_tier_ran=1
+      echo ""
+      continue
+    fi
 
-          if [[ "$test_script" == "yes" ]]; then
-            echo "Running TypeScript/JavaScript tests..."
-            if command -v pnpm >/dev/null 2>&1 && [[ -f "$project_root/pnpm-lock.yaml" ]]; then
-              (cd "$project_root" && pnpm test) || exit_code=1
-            elif command -v npm >/dev/null 2>&1; then
-              (cd "$project_root" && npm test) || exit_code=1
-            fi
-          elif [[ -f "$project_root/vitest.config.ts" ]] || [[ -f "$project_root/vitest.config.js" ]]; then
-            echo "Running vitest..."
-            (cd "$project_root" && npx vitest run) || exit_code=1
-          elif [[ -f "$project_root/jest.config.ts" ]] || [[ -f "$project_root/jest.config.js" ]]; then
-            echo "Running jest..."
-            (cd "$project_root" && npx jest) || exit_code=1
-          else
-            echo "[info] No TypeScript test script or config found in package.json"
-          fi
-        fi
-        ;;&
-      unknown)
-        if [[ -f "$project_root/Makefile" ]] && grep -q '^test:' "$project_root/Makefile"; then
-          echo "Running make test..."
-          (cd "$project_root" && make test) || exit_code=1
-        elif [[ "$project_root" == "$target_dir" ]]; then
-          echo "[warn] No test framework detected. Set up pytest, vitest, or jest for your project."
-          exit_code=1
-        fi
-        ;;
-    esac
+    echo "=== Tier: $requested_tier ==="
+    tier_ran_any=0
+
+    for project_root in "${project_roots[@]}"; do
+      stack="$(detect_stack "$project_root")"
+      root_label="${project_root#"$target_dir"}"
+      root_label="${root_label:-/}"
+      echo "Test target: $project_root ($root_label)"
+      echo "Detected stack: $stack"
+      echo ""
+
+      tier_ran=0
+      if ! run_test_tier_for_root "$requested_tier" "$project_root" "$stack" tier_ran; then
+        exit_code=1
+      fi
+      if [[ "$tier_ran" == "1" ]]; then
+        any_tier_ran=1
+        tier_ran_any=1
+      fi
+      echo ""
+    done
+
+    if [[ $tier_ran_any -eq 0 ]]; then
+      echo "[info] No $requested_tier checks discovered for selected targets"
+      echo ""
+    fi
   done
 
-  if [[ $run_e2e -eq 1 ]]; then
-    if [[ -f "$target_dir/playwright.config.ts" ]] || [[ -f "$target_dir/playwright.config.js" ]]; then
-      echo ""
-      echo "Running Playwright E2E tests..."
-      (cd "$target_dir" && npx playwright test) || exit_code=1
-    else
-      echo "[info] No Playwright config found; skipping E2E tests"
-    fi
+  if [[ $any_tier_ran -eq 0 ]]; then
+    echo "[warn] No test runners or tier-specific scripts were discovered for the selected tiers."
+    exit_code=1
   fi
 
   echo ""
@@ -1593,11 +2016,12 @@ EOF
 Stage: test
 
 What it is:
-  Automated and manual verification: unit tests, integration tests, and
-  spot-checks against acceptance criteria.
+  Tiered verification: unit, integration, e2e, accessibility, performance,
+  and security checks selected by repo defaults or feature risk.
 
 Who runs it:
-  /speckit.test command, then kite test for the stack's native runner.
+  /speckit.test command, then kite test for the stack's native runners and
+  configured verification profile.
 
 What comes out:
   Passing test suite and a short summary (optionally under
@@ -1825,7 +2249,7 @@ run_new() {
   fi
 
   if [[ $test_tier_set -ne 1 ]]; then
-    prompt_choice test_tier "Choose the default verification tier to record:" "$test_tier" \
+    prompt_choice test_tier "Choose the default verification profile to record:" "$test_tier" \
       "smoke|Smoke|Fast confidence checks before bigger changes" \
       "standard|Standard|Balanced default for day-to-day feature work" \
       "full|Full|Heavier verification before release or risky refactors"
@@ -1834,7 +2258,7 @@ run_new() {
   validate_choice "template" "$template" base python typescript fullstack || return 1
   validate_choice "license" "$license" MIT Apache-2.0 GPL-3.0-only UNLICENSED || return 1
   validate_choice "deploy target" "$deploy_target" none flyio railway render vercel aws || return 1
-  validate_choice "test tier" "$test_tier" smoke standard full || return 1
+  validate_choice "test tier" "$test_tier" smoke standard full unit integration e2e a11y perf security all || return 1
 
   echo "Scaffolding $project_name..."
   mkdir -p "$project_dir"
@@ -2431,7 +2855,7 @@ _kite_completion() {
   local doctor_options="--speckit-version --repo --ref --source-dir -h --help"
   local status_options="--json --repo --ref --source-dir -h --help"
   local feature_options="--json -h --help"
-  local test_options="--e2e -h --help"
+  local test_options="--tier --profile --test-tier --e2e -h --help"
   local audit_options="--fix -h --help"
   local new_options="--template --license --deploy-target --test-tier --with-speckit --speckit-version --git-init-commit --repo --ref --source-dir -h --help"
   local release_subcommands="prepare publish"

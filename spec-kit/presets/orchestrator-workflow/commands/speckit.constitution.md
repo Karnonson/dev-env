@@ -24,6 +24,7 @@ Ask targeted questions when the answer is not already explicit in the user input
 4. Which implementation roles are primary in this repo: backend, UI, or both?
 5. When work spans both backend and UI, should implementation be split by specialist instead of using a single generic implement pass?
 6. Are there any stack-specific constraints, security rules, performance targets, or documentation requirements that must become constitutional rules?
+7. What is the default verification profile or tier set for feature work: `smoke`, `standard`, `full`, or an explicit combination such as `unit + integration + security`?
 
 If key answers are missing, stop after asking the minimum set of questions needed. Do not draft the constitution until the user answers.
 
@@ -35,9 +36,10 @@ If key answers are missing, stop after asking the minimum set of questions neede
 4. Ensure the constitution captures, when requested by the user:
    - a mandatory design step for UI-heavy work before specification or implementation
    - the preferred use of backend and UI specialists for implementation
-
-- a feature-branch workflow where work stays off `main` until verification and review are complete
-- review, testing, and document-ownership expectations
+  - the default verification profile or tier set required before review or merge
+  - any mandatory `a11y`, `perf`, or `security` tiers for risky or user-facing changes
+  - a feature-branch workflow where work stays off `main` until verification and review are complete
+  - review, testing, and document-ownership expectations
 
 5. Update `.specify/memory/constitution.md` in place.
 6. Ensure the file opens with the artifact front matter block described in `spec-kit/templates/artifact-front-matter.md`. Set `stage: constitution`, `last_agent: speckit.constitution`, refresh `updated_at`, and preserve `created_at` if it already exists.

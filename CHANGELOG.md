@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
 - Design direction written to `.specify/memory/design-direction.md`
 - Orchestrator agents list includes all speckit commands
 - `kite new` now offers picker-driven defaults for template, license, deploy target, and test tier
+- `kite test` now resolves `smoke`/`standard`/`full` profiles into tiered verification (`unit`, `integration`, `e2e`, `a11y`, `perf`, `security`) and discovers package-manager workspaces plus common monorepo app folders
 - `kite release` now uses `prepare` and `publish` steps with feature-branch gating, publish-time dry runs, and release-note previews sourced from merged PR titles plus `[Unreleased]`
 - installer seeds `.kite/config.yml` without overwriting existing repo-local choices
 

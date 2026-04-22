@@ -237,6 +237,13 @@ grep -q "Verify whether the target repo is ready" "$status_log"
 )
 grep -q -- "--json" "$status_log"
 
+(
+  cd "$update_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" help test > "$status_log"
+)
+grep -q -- "--tier" "$status_log"
+grep -q -- "--profile" "$status_log"
+
 bash "$repo_root/.devcontainer/bin/kite" completion bash > "$status_log"
 grep -q "complete -F _kite_completion kite" "$status_log"
 

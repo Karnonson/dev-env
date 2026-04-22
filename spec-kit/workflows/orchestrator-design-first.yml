@@ -246,6 +246,8 @@ steps:
       Review the test results before code review.
 
       Checklist:
+      - Required constitutional test tiers have run.
+      - Approved exceptions are documented.
       - Relevant automated checks passed.
       - Manual checks or known gaps are documented.
       - Coverage matches the intended confidence level for this feature.
