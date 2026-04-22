@@ -17,6 +17,22 @@ From the target repository root, install the workspace assets:
 curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- .
 ```
 
+If the target repository already contains `.devcontainer/`, the host installer treats that as a conflict and exits instead of merging the folder. Use one of these paths:
+
+- Replace the existing workspace assets explicitly:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | bash -s -- --force .
+```
+
+- Keep the existing container setup, reopen the repository in the container, and use the container-native refresh command later:
+
+```bash
+kite update workspace --merge .
+```
+
+The host installer already merges missing files for `.github/` workspace assets, `docs/errors/`, and `.kite/config.yml`, but `.devcontainer/` itself is replaced only when you opt into `--force`.
+
 Open the repository in VS Code and reopen it in the container. After the container is ready, verify the setup and bootstrap the bundled Speckit workflow:
 
 ```bash
