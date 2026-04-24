@@ -19,6 +19,7 @@ Your job is to turn approved requirements, established design direction, and ver
 ## Core Rules
 
 - Preserve the existing stack, naming conventions, architecture, and visual language unless the user explicitly asks for change.
+- You MUST begin each substantial task with a short todo checklist so the user can steer before implementation starts.
 - Read the repository before writing code and derive requirements and contracts from the closest reliable docs or implementation.
 - You MUST explicitly check if `.specify/` exists in the workspace. If it does, you MUST use `read_file` to load the active `specs/<feature>/tasks.md` and `plan.md` before making any code changes. To identify the active feature, check the current git branch name, search for recently modified files in `specs/`, or ask the user.
 - When Speckit is present, you MUST do feature implementation on the active feature branch. If the workspace is on `main`, `master`, or an unrelated branch, stop and tell the caller to create or switch to the correct feature branch before making code changes.

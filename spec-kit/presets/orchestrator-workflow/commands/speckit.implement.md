@@ -23,7 +23,7 @@ handoffs:
 $ARGUMENTS
 ```
 
-Treat `spec.md`, `plan.md`, and `tasks.md` as canonical.
+Treat `spec.md`, `plan.md`, and `tasks.md` as canonical. Start by sharing a short todo checklist, then route all repository implementation work only through `Backend Dev` and `UI Builder`.
 
 ## Outline
 

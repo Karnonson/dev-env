@@ -77,6 +77,12 @@ has_speckit_templates() {
     .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
     .specify/presets/orchestrator-workflow/commands/speckit.test.md
     .specify/workflows/orchestrator-design-first/workflow.yml
+    .specify/templates/artifact-front-matter.md
+    .specify/templates/discovery.md
+    .specify/templates/constitution.md
+    .specify/templates/design-direction.md
+    .specify/templates/plan.md
+    .specify/templates/test-results.md
     .github/agents/speckit.constitution.agent.md
     .github/agents/speckit.design.agent.md
     .github/agents/speckit.implement.agent.md
@@ -339,6 +345,22 @@ ensure_gitignore() {
   } >> "$target_path"
 }
 
+sync_speckit_templates_from_source() {
+  local source_templates="$1/spec-kit/templates"
+  local target_templates="$2/.specify/templates"
+
+  if [[ ! -d "$source_templates" ]]; then
+    return
+  fi
+
+  if [[ $force_speckit_init -eq 1 ]]; then
+    replace_tree "$source_templates" "$target_templates"
+    return
+  fi
+
+  merge_missing_tree "$source_templates" "$target_templates"
+}
+
 sync_repo_local_kite_config() {
   local source_config_dir="$1/.kite"
   local target_config_dir="$2/.kite"
@@ -503,6 +525,7 @@ bootstrap_speckit() {
     workflow_path="$source_root/spec-kit/workflows/orchestrator-design-first.yml"
     stage_speckit_bootstrap "$preset_dir" "$workflow_path"
     sync_staged_speckit_bootstrap
+    sync_speckit_templates_from_source "$source_root" "$target_dir"
   fi
 
   ensure_git_main_branch_preference
@@ -603,9 +626,11 @@ if [[ $dry_run -eq 1 ]]; then
     if [[ $force_speckit_init -eq 1 ]]; then
       echo "  replace preset: orchestrator-workflow -> .specify/presets/"
       echo "  replace workflow: orchestrator-design-first -> .specify/workflows/"
+      echo "  replace templates -> .specify/templates/"
     else
       echo "  merge   preset: orchestrator-workflow -> .specify/presets/"
       echo "  merge   workflow: orchestrator-design-first -> .specify/workflows/"
+      echo "  merge   templates -> .specify/templates/"
     fi
   fi
   exit 0

@@ -26,6 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | ba
 If the target repository already has a `.devcontainer/` folder, the installer preserves it by default and refreshes the Kite-owned support files under `.devcontainer/bin/kite`, `.devcontainer/kite-post-create.sh`, and `.devcontainer/README.kite.md`. Use `--force` only when you intend to swap in the bundled container. After reopening in that container:
 
 - run `bash .devcontainer/kite-post-create.sh` if `kite` is not yet on `PATH`
+- if the workspace was not already a git repository, Kite initializes one on `main` during post-create so discovery can start on a feature branch immediately
 - run `kite doctor .`
 
 ## Minimal Example

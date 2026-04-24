@@ -12,7 +12,9 @@ handoffs:
 $ARGUMENTS
 ```
 
-Use this command when the user has a feature idea but needs a structured artifact that captures the problem, user, outcome, and success signal before technical specification starts.
+Use this command when the user has a feature idea but needs a structured artifact that captures the problem, user, outcome, and success signal before technical specification starts. `Strategist` is optional before this stage; discovery is the first formal artifact-writing step.
+
+Before asking questions or writing the artifact, share a short todo checklist so the user can steer the discovery pass.
 
 ## Clarification Rules
 
@@ -50,7 +52,8 @@ Assistant: What specific outcome should improve for them?
    - fold the key findings back into the discovery artifact
   If the user declines, record that market validation was skipped.
 6. Write the canonical discovery artifact to `specs/<feature>/discovery.md`.
-7. Open the file with the artifact front matter block described in `spec-kit/templates/artifact-front-matter.md`. Set `stage: discover`, `last_agent: speckit.discover`, refresh `updated_at`, and preserve `created_at` if it already exists.
-8. Keep the artifact plain-language and decision-oriented. Surface open risks explicitly instead of smoothing them over.
-9. Do not create `specs/<feature>/brief.md` as part of this workflow.
-10. End with a handoff-ready summary for `speckit.constitution`.
+7. Before writing, check `.specify/templates/discovery.md` and the rest of `.specify/templates/` for a matching discovery template and follow it when present.
+8. Open the file with the artifact front matter block described in `.specify/templates/artifact-front-matter.md`. Set `stage: discover`, `last_agent: speckit.discover`, refresh `updated_at`, and preserve `created_at` if it already exists.
+9. Keep the artifact plain-language and decision-oriented. Surface open risks explicitly instead of smoothing them over.
+10. Do not create `specs/<feature>/brief.md` as part of this workflow.
+11. End with a handoff-ready summary for `speckit.constitution`.

@@ -10,7 +10,8 @@ $ARGUMENTS
 
 ## Outline
 
-1. Read `.specify/feature.json` to locate the active feature directory.
+1. Share a short todo checklist before touching the repo so the user can steer the UI slice.
+2. Read `.specify/feature.json` to locate the active feature directory.
 2. Load `spec.md`, `plan.md`, `tasks.md`, `.specify/memory/constitution.md`, and `.specify/memory/design-direction.md` (the canonical design system and brand identity guide).
 3. Confirm the current git branch matches the active feature work. Do not implement UI changes on `main` or `master`.
 4. Execute only UI-oriented tasks such as pages, components, forms, responsive layouts, accessibility, and interaction states.

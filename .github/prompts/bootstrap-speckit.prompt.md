@@ -116,12 +116,15 @@ This repo-local alignment should make the repo behave like this:
 
 - Speckit owns the canonical feature lifecycle.
 - `specs/<feature>/discovery.md`, `spec.md`, `plan.md`, and `tasks.md` are canonical when present.
-- Discovery goes through `Strategist` and optionally `Marketer`.
-- `Backend Dev` and `UI Builder` are the primary implementation agents.
-- `Designer` is an optional post-specification design stage for visual direction, UX decisions, or design-system work on UI-heavy features.
-- The default lifecycle is `Strategist -> feature start -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature`.
+- `Strategist` is optional pre-workflow support for ambiguous ideas or market validation. The formal artifact workflow starts at `feature start -> speckit.discover`.
+- `Backend Dev` and `UI Builder` are the only implementation agents for repository changes.
+- `Designer` is a required post-specification design stage for frontend, UX, or visual-system work. It uses the user's color preferences and applies MD3 principles to the rest of the design system.
+- The formal lifecycle is `feature start -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design (for frontend or UX-heavy work) -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature`.
 - `brief.md` is not part of the default lifecycle or canonical artifact set.
-- Before discovery writes canonical artifacts, the feature branch and `.specify/feature.json` must be aligned to the same feature identifier.
+- Before discovery writes canonical artifacts, the feature branch and `.specify/feature.json` must be aligned to the same feature identifier, and discovery must never start on `main`.
+- Every agent must begin meaningful work with a short todo checklist.
+- Before a canonical artifact is written, the agent must check `.specify/templates/` for a matching template and follow it when present.
+- Agents must not guess what a user-named technology means; they must ask if the role of a framework such as `Mastra` is unclear.
 - Run `speckit.analyze` after `speckit.tasks` and before implementation.
 - Implementation happens on feature branches, not `main`, and merge to `main` only after review and verification pass.
 - After implementation, prefer `Code Reviewer` before final verification or merge.
@@ -147,13 +150,17 @@ If `.github/copilot-instructions.md` does not exist, create it with this baselin
 ## Agent Workflow
 
 - Prefer the user-level `Orchestrator` agent for end-to-end feature coordination so stage transitions stay consistent.
-- The full SDD cycle is: `Strategist -> feature start -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature`.
-- Use Strategist to explore and pressure-test ideas first. After approval, start the feature branch and active feature context, then route through `speckit.discover`, `speckit.constitution`, and `speckit.specify` before planning implementation.
-- Designer runs **after** `speckit.specify` to create design direction and brand identity. Designer writes to `.specify/memory/design-direction.md`. UI Builder reads this during implementation.
-- Backend Dev and UI Builder are the primary implementation agents.
-- DevOps handles CI/CD, deployment, infrastructure, and production readiness.
+- `Strategist` is optional pre-workflow support for ambiguous ideas or market validation. Once the feature is approved, the formal custom Speckit flow starts at `feature start -> speckit.discover`.
+- The formal SDD cycle is: `feature start -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design (for frontend or UX-heavy work) -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature`.
+- Discovery must begin on the active feature branch with `.specify/feature.json` aligned to the same feature identifier.
+- Designer runs **after** `speckit.specify` for frontend or UX-heavy work. Designer uses the user's color preferences and applies MD3 principles to the rest of the design system. Designer writes to `.specify/memory/design-direction.md`. UI Builder reads this during implementation.
+- Only Backend Dev and UI Builder may propose or apply repository implementation changes.
+- DevOps handles CI/CD, deployment, infrastructure, and production readiness as advisory guidance unless Backend Dev or UI Builder is explicitly applying the resulting repo changes.
 - If Speckit is not installed yet and a durable idea note is useful before canonical discovery starts, store it under `team/agents/<agent-name>/YYYY-MM-DD-<feature-name>.md`.
 - Once a feature direction is approved, align the feature branch with `.specify/feature.json`, then start the canonical front-of-lifecycle sequence with `speckit.discover`, `speckit.constitution`, and `speckit.specify`.
+- Before a canonical artifact is written, check `.specify/templates/` for the matching template and follow it when present.
+- Every agent should begin meaningful work by sharing a short todo checklist so the user can steer before the task proceeds.
+- Never guess what a user-named technology means. Ask a clarification question if the role of a framework or service is not explicit.
 - Let Speckit own specification, clarification, planning, tasks, and consistency analysis.
 - Do implementation work on the active feature branch and keep `main` as the merge target only after verification and review are complete.
 - After `speckit.tasks`, implementation agents must execute from the active `tasks.md` and reference relevant FR IDs, user stories, or task IDs from the matching Speckit artifact set.

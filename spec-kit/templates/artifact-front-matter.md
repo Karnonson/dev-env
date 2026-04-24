@@ -77,10 +77,11 @@ updated_at: 2025-02-14
 
 Speckit command prompts and custom agents SHOULD:
 
-1. Emit this block as the first lines of any new canonical artifact.
-2. Update `updated_at`, `status`, and `last_agent` whenever they edit an
+1. Check `.specify/templates/` for the most specific matching artifact template before drafting a canonical artifact.
+2. Emit this block as the first lines of any new canonical artifact.
+3. Update `updated_at`, `status`, and `last_agent` whenever they edit an
    existing artifact.
-3. Leave `created_at` unchanged after the first write.
+4. Leave `created_at` unchanged after the first write.
 
 Humans editing artifacts manually should update `updated_at` at minimum.
 

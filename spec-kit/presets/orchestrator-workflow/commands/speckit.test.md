@@ -14,7 +14,8 @@ $ARGUMENTS
 
 ## Outline
 
-1. Read `.specify/feature.json` to locate the active feature directory.
+1. Share a short todo checklist before running verification so the user can steer the test pass.
+2. Read `.specify/feature.json` to locate the active feature directory.
 2. Load the active `spec.md`, `plan.md`, `tasks.md`, `.specify/memory/constitution.md`, and `.kite/config.yml` when present.
 3. Confirm the current git branch is the active feature branch. Do not run tests on `main` or `master` unless explicitly asked.
 4. Resolve the required verification scope in this order:
@@ -39,4 +40,4 @@ $ARGUMENTS
 - Whether the feature branch is ready for code review
 
 11. If no test framework is discovered for the required tiers, report that and recommend setting one up appropriate to the project stack.
-12. When results are meaningful enough to persist (non-trivial runs, flakes, or pre-review summaries), write them to `specs/<feature>/test-results.md`. Open the file with the artifact front matter block described in `spec-kit/templates/artifact-front-matter.md`. Set `stage: test`, `last_agent: speckit.test`, refresh `updated_at`, and preserve `created_at` if it already exists.
+12. When results are meaningful enough to persist (non-trivial runs, flakes, or pre-review summaries), check `.specify/templates/test-results.md` and the rest of `.specify/templates/` for a matching template before writing `specs/<feature>/test-results.md`. Open the file with the artifact front matter block described in `.specify/templates/artifact-front-matter.md`. Set `stage: test`, `last_agent: speckit.test`, refresh `updated_at`, and preserve `created_at` if it already exists.
