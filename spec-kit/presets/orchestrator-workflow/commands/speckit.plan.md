@@ -22,7 +22,7 @@ Before asking questions or drafting `plan.md`, share a short todo checklist so t
 
 When clarification is needed, ask exactly one question at a time and wait for the user's answer before asking the next one. Do not send a batched implementation questionnaire unless the user explicitly asks for that format.
 
-When the user names a technology, framework, or service, treat that name as authoritative context. Do not redefine it, map it to a different category, or guess why it is present. If the role of a named technology such as `Mastra` is unclear, ask one clarification question instead.
+When the user names a technology, framework, or service in their response, treat that name as authoritative context. Do not redefine it, map it to a different category, or guess why it is present. If the role of a user-selected technology is unclear, ask one clarification question instead.
 
 ## Interaction Example
 

@@ -9,7 +9,7 @@ Use this structure for `.specify/memory/design-direction.md` when no stronger re
 - Brand tone
 - Color palette based on user preferences
 - Typography
-- Spacing, radius, elevation, and borders using MD3-aligned rules unless the repo defines a stronger system
+- Spacing, radius, elevation, and borders using Material Design 3 (MD3)-aligned rules unless the repo defines a stronger system
 
 ## Component Rules
 - Buttons

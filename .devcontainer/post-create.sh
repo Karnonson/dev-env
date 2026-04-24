@@ -29,9 +29,16 @@ ensure_workspace_git_repo() {
   fi
 
   echo "Initializing a git repository in $target"
-  if ! git -C "$target" init -b main >/dev/null 2>&1; then
-    git -C "$target" init >/dev/null 2>&1
+  local init_log
+  init_log="$(mktemp)"
+  if ! git -C "$target" init -b main >"$init_log" 2>&1; then
+    if ! git -C "$target" init >>"$init_log" 2>&1; then
+      cat "$init_log" >&2
+      rm -f "$init_log"
+      return 1
+    fi
   fi
+  rm -f "$init_log"
   git -C "$target" config --local init.defaultBranch main || true
 
   current_branch="$(git -C "$target" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
