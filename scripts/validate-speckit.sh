@@ -328,4 +328,4 @@ mkdir -p "$post_create_target_dir"
 )
 
 git -C "$post_create_target_dir" rev-parse --git-dir >/dev/null
-grep -q '^ref: refs/heads/main$' <(git -C "$post_create_target_dir" symbolic-ref HEAD)
+grep -q '^refs/heads/main$' <(git -C "$post_create_target_dir" symbolic-ref HEAD)
