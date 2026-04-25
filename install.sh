@@ -353,12 +353,30 @@ sync_speckit_templates_from_source() {
     return
   fi
 
-  if [[ $force_speckit_init -eq 1 ]]; then
-    replace_tree "$source_templates" "$target_templates"
+  replace_tree "$source_templates" "$target_templates"
+}
+
+sync_speckit_preset_from_source() {
+  local source_preset="$1/spec-kit/presets/orchestrator-workflow"
+  local target_preset="$2/.specify/presets/orchestrator-workflow"
+
+  if [[ ! -d "$source_preset" ]]; then
     return
   fi
 
-  merge_missing_tree "$source_templates" "$target_templates"
+  replace_tree "$source_preset" "$target_preset"
+}
+
+sync_speckit_workflow_from_source() {
+  local source_workflow="$1/spec-kit/workflows/orchestrator-design-first.yml"
+  local target_workflow="$2/.specify/workflows/orchestrator-design-first/workflow.yml"
+
+  if [[ ! -f "$source_workflow" ]]; then
+    return
+  fi
+
+  mkdir -p "$(dirname "$target_workflow")"
+  cp "$source_workflow" "$target_workflow"
 }
 
 sync_repo_local_kite_config() {
@@ -525,9 +543,11 @@ bootstrap_speckit() {
     workflow_path="$source_root/spec-kit/workflows/orchestrator-design-first.yml"
     stage_speckit_bootstrap "$preset_dir" "$workflow_path"
     sync_staged_speckit_bootstrap
-    sync_speckit_templates_from_source "$source_root" "$target_dir"
   fi
 
+  sync_speckit_preset_from_source "$source_root" "$target_dir"
+  sync_speckit_workflow_from_source "$source_root" "$target_dir"
+  sync_speckit_templates_from_source "$source_root" "$target_dir"
   ensure_git_main_branch_preference
 }
 

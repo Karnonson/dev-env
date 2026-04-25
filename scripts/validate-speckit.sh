@@ -107,6 +107,17 @@ test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/spe
 test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md"
 test ! -d "$partial_target_dir/spec-kit"
 
+printf 'STALE PLAN TEMPLATE\n' > "$partial_target_dir/.specify/templates/plan.md"
+printf 'STALE PROMPT\n' > "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.plan.md"
+printf 'STALE WORKFLOW\n' > "$partial_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
+
+bash "$repo_root/install.sh" --with-speckit --speckit-version "$speckit_version" --source-dir "$repo_root" "$partial_target_dir"
+
+test ! -f "$partial_target_dir/spec-kit"
+grep -q "Plan-First Rule" "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.plan.md"
+grep -q "Plan Artifact Template" "$partial_target_dir/.specify/templates/plan.md"
+grep -q 'id: "orchestrator-design-first"' "$partial_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
+
 mkdir -p "$archive_target_dir"
 while IFS= read -r -d '' repo_file; do
   if [[ -e "$repo_root/$repo_file" ]]; then

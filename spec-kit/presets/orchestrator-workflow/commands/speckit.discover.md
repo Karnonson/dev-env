@@ -51,8 +51,8 @@ Assistant: What specific outcome should improve for them?
    - store the durable output at `specs/<feature>/market-validation.md`
    - fold the key findings back into the discovery artifact
   If the user declines, record that market validation was skipped.
-6. Write the canonical discovery artifact to `specs/<feature>/discovery.md`.
-7. Before writing, check `.specify/templates/discovery.md` and the rest of `.specify/templates/` for a matching discovery template and follow it when present.
+6. Before writing, check `.specify/templates/discovery.md` and the rest of `.specify/templates/` for a matching discovery template and follow it when present.
+7. Write the canonical discovery artifact to `specs/<feature>/discovery.md`.
 8. Open the file with the artifact front matter block described in `.specify/templates/artifact-front-matter.md`. Set `stage: discover`, `last_agent: speckit.discover`, refresh `updated_at`, and preserve `created_at` if it already exists.
 9. Keep the artifact plain-language and decision-oriented. Surface open risks explicitly instead of smoothing them over.
 10. Do not create `specs/<feature>/brief.md` as part of this workflow.

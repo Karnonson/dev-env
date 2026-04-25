@@ -59,7 +59,7 @@ handoffs:
     send: true
   - label: Set Up CI/CD
     agent: DevOps
-    prompt: Set up or update CI/CD pipelines, deployment configuration, and infrastructure for the active feature.
+    prompt: Review the CI/CD, deployment, and infrastructure needs for the active feature and produce an implementation handoff for Backend Dev or UI Builder.
     send: true
 ---
 
@@ -108,7 +108,7 @@ When Speckit is not installed:
 14. After implementation, route to `speckit.test` to discover and run the project's test suite. All tests must pass before proceeding.
 15. After tests pass, route to `Code Reviewer` for multi-perspective review.
 16. After review is addressed, run `kite verify feature` for the pre-merge checklist before recommending merge to `main`.
-17. CI/CD, deployment, infrastructure, and production readiness work goes to DevOps for planning, review, and handoff guidance unless the user explicitly asks Backend Dev or UI Builder to apply the resulting repository changes.
+17. CI/CD, deployment, infrastructure, and production readiness work goes to DevOps for planning, review, and handoff guidance. Route any resulting repository changes to Backend Dev unless the work is tightly coupled to frontend deployment wiring that UI Builder already owns.
 18. If no specialist agent exists for the requested domain, explain the gap and continue with the closest appropriate non-implementation agent until Backend Dev or UI Builder can take over for repo changes.
 
 ## Constraints
