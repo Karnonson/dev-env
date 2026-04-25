@@ -43,7 +43,9 @@ ensure_workspace_git_repo() {
 
   current_branch="$(git -C "$target" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
   if [[ "$current_branch" == "master" ]] && ! git -C "$target" rev-parse --verify HEAD >/dev/null 2>&1; then
-    git -C "$target" symbolic-ref HEAD refs/heads/main || true
+    if ! git -C "$target" symbolic-ref HEAD refs/heads/main; then
+      echo "Warning: git repository initialized, but Kite could not repoint the unborn branch from master to main." >&2
+    fi
   fi
 }
 
