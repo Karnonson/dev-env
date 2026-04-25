@@ -70,6 +70,7 @@ has_speckit_templates() {
     .specify/presets/orchestrator-workflow/preset.yml
     .specify/presets/orchestrator-workflow/commands/speckit.discover.md
     .specify/presets/orchestrator-workflow/commands/speckit.constitution.md
+    .specify/presets/orchestrator-workflow/commands/speckit.specify.md
     .specify/presets/orchestrator-workflow/commands/speckit.design.md
     .specify/presets/orchestrator-workflow/commands/speckit.plan.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.md
@@ -81,6 +82,7 @@ has_speckit_templates() {
     .specify/templates/discovery.md
     .specify/templates/constitution.md
     .specify/templates/design-direction.md
+    .specify/templates/spec.md
     .specify/templates/plan.md
     .specify/templates/test-results.md
     .github/agents/speckit.constitution.agent.md

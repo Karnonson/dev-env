@@ -519,6 +519,7 @@ has_speckit_bootstrap() {
     .specify/presets/orchestrator-workflow/preset.yml
     .specify/presets/orchestrator-workflow/commands/speckit.discover.md
     .specify/presets/orchestrator-workflow/commands/speckit.constitution.md
+    .specify/presets/orchestrator-workflow/commands/speckit.specify.md
     .specify/presets/orchestrator-workflow/commands/speckit.design.md
     .specify/presets/orchestrator-workflow/commands/speckit.plan.md
     .specify/presets/orchestrator-workflow/commands/speckit.implement.md
@@ -526,6 +527,13 @@ has_speckit_bootstrap() {
     .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
     .specify/presets/orchestrator-workflow/commands/speckit.test.md
     .specify/workflows/orchestrator-design-first/workflow.yml
+    .specify/templates/artifact-front-matter.md
+    .specify/templates/discovery.md
+    .specify/templates/constitution.md
+    .specify/templates/design-direction.md
+    .specify/templates/spec.md
+    .specify/templates/plan.md
+    .specify/templates/test-results.md
     .github/agents/speckit.constitution.agent.md
     .github/agents/speckit.design.agent.md
     .github/agents/speckit.implement.agent.md
@@ -1747,16 +1755,20 @@ run_feature_status() {
     "$feature_dir/learn.md"
   )
 
-  # Walk in order; last present artifact defines the current stage.
+  # Walk in order; only a contiguous artifact chain advances the current stage.
   local i count=${#artifact_labels[@]}
+  local contiguous=1
   for (( i=0; i<count; i++ )); do
     local label="${artifact_labels[$i]}"
     local path="${artifact_paths[$i]}"
     if [[ -f "$path" ]]; then
       present_labels+=("$label")
-      current_stage="$label"
+      if [[ "$contiguous" -eq 1 ]]; then
+        current_stage="$label"
+      fi
     else
       pending_labels+=("$label")
+      contiguous=0
     fi
   done
 

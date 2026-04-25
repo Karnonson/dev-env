@@ -40,20 +40,30 @@ Assistant: Are there any cross-team dependencies that affect sequencing?
 ## Outline
 
 1. Read the active `specs/<feature>/spec.md`.
-2. Read `.specify/memory/constitution.md` for project-level constraints and verification expectations.
-3. When `.specify/memory/design-direction.md` exists, read it and treat its UI, accessibility, and responsive decisions as required planning inputs rather than optional notes.
-4. For frontend, UX-heavy, or visually significant work, require `.specify/memory/design-direction.md` before finalizing the plan. If that artifact is missing, stop and route to `Designer` / `speckit.design` instead of guessing UI decisions. For non-UI work, continue without it when no design artifact exists.
-5. Before writing, check `.specify/templates/plan.md` and the rest of `.specify/templates/` for a matching plan template and follow it when present.
-6. When information is missing, ask exactly one clarifying question per turn to remove ambiguity around architecture, sequencing, dependencies, verification, delivery risk, rollout constraints, and the role of user-specified technologies.
-7. Structure the plan so `speckit.tasks` can execute from it directly. Cover:
-   - delivery phases and sequencing
-   - architecture, contracts, and data-flow decisions that materially affect delivery
-   - dependencies, prerequisites, and handoff boundaries
-   - verification strategy derived from the constitution and feature risk
-   - rollout, migration, and operational considerations when relevant
-   - open risks, assumptions, and mitigations
-8. When `.specify/memory/design-direction.md` exists, fold those design requirements into the affected plan sections instead of treating them as a parallel planning artifact.
-9. Write the canonical implementation plan to `specs/<feature>/plan.md`.
-10. Open `specs/<feature>/plan.md` with the artifact front matter block described in `.specify/templates/artifact-front-matter.md`. Set `stage: plan`, `last_agent: speckit.plan`, refresh `updated_at`, and preserve `created_at` if it already exists.
-11. Keep the plan implementation-ready and decision-oriented. Do not create a second backlog or a default `team/agents` planning artifact.
-12. End with a concise handoff summary for `speckit.tasks`.
+2. Read `specs/<feature>/discovery.md` when it exists so the plan still reflects the approved problem statement, user, assumptions, and success metrics rather than drifting into implementation-only thinking.
+3. Read `.specify/memory/constitution.md` for project-level constraints and verification expectations.
+4. When `.specify/memory/design-direction.md` exists, read it and treat its UI, accessibility, and responsive decisions as required planning inputs rather than optional notes.
+5. For frontend, UX-heavy, or visually significant work, require `.specify/memory/design-direction.md` before finalizing the plan. If that artifact is missing, stop and route to `Designer` / `speckit.design` instead of guessing UI decisions. For non-UI work, continue without it when no design artifact exists.
+6. Before writing, check `.specify/templates/plan.md` and the rest of `.specify/templates/` for a matching plan template and follow it when present.
+7. Write or update `specs/<feature>/plan.md` as the canonical implementation plan.
+8. Structure the plan around the template sections and make each section decision-oriented. Cover:
+  - summary and technical context
+  - constitution check and justified complexity trade-offs
+  - project structure, touched code areas, and any companion artifacts such as `research.md`, `data-model.md`, `contracts/`, and `quickstart.md` when they materially reduce ambiguity
+  - delivery phases and sequencing
+  - architecture, contracts, and data-flow decisions that materially affect delivery
+  - dependencies, prerequisites, and handoff boundaries
+  - verification strategy derived from the constitution and feature risk
+  - rollout, migration, and operational considerations when relevant
+  - open risks, assumptions, and mitigations
+  - a direct handoff to `speckit.tasks`
+9. When information is missing, ask exactly one clarifying question per turn to remove ambiguity around architecture, sequencing, dependencies, verification, delivery risk, rollout constraints, and the role of user-specified technologies.
+10. When the plan exposes unknowns that materially affect delivery, resolve them inside the planning pass and persist the durable outcome in the smallest supporting artifact that helps execution:
+  - `research.md` for decisions, rationale, and rejected alternatives
+  - `data-model.md` for entities, validation rules, and state transitions
+  - `contracts/` for external or cross-boundary interfaces
+  - `quickstart.md` for feature-specific setup or verification flows
+11. When `.specify/memory/design-direction.md` exists, fold those design requirements into the affected plan sections instead of treating them as a parallel planning artifact.
+12. Open `specs/<feature>/plan.md` with the artifact front matter block described in `.specify/templates/artifact-front-matter.md`. Set `stage: plan`, `last_agent: speckit.plan`, refresh `updated_at`, and preserve `created_at` if it already exists.
+13. Keep the plan implementation-ready and decision-oriented. Do not create a second backlog or a default `team/agents` planning artifact.
+14. End with a concise handoff summary for `speckit.tasks`.

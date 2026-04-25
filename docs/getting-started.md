@@ -27,6 +27,8 @@ kite install speckit .
 kite status .
 ```
 
+`kite install speckit .` installs the bundled Speckit preset, workflow, and default artifact templates. That includes the canonical `speckit.specify` command prompt plus `.specify/templates/spec.md` and the updated `.specify/templates/plan.md` used by the design-first workflow.
+
 ## Install Into An Existing Repository
 
 Use the host only to copy the workspace assets into a repository that does not already contain them:
@@ -42,6 +44,8 @@ kite doctor .
 kite install speckit .
 kite status .
 ```
+
+After that step, the repository is ready for the bundled authoring flow: discovery, constitution, specification, optional design, planning, tasks, analysis, implementation, and test.
 
 If the target repository already contains `.devcontainer/`, the host installer preserves that folder by default. It refreshes the Kite-owned support files under `.devcontainer/bin/kite`, `.devcontainer/kite-post-create.sh`, and `.devcontainer/README.kite.md` without replacing the repo-owned container definition files. Use `--force` only when you intentionally want to replace the existing workspace assets with the bundled base container:
 
@@ -90,6 +94,8 @@ curl -fsSL https://raw.githubusercontent.com/Karnonson/kite/main/install.sh | ba
 ```
 
 That shortcut is secondary to the container flow and requires `curl`, `tar`, and `uvx` or `specify` on the host.
+
+The host-side bootstrap installs the same bundled Speckit assets, including `speckit.specify`, `.specify/templates/spec.md`, and `.specify/templates/plan.md`.
 
 ## Refresh An Existing Workspace
 

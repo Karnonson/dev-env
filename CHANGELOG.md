@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - DevOps agent for CI/CD, deployment, and infrastructure work
+- bundled `speckit.specify` command prompt for canonical feature specifications
+- bundled `.specify/templates/spec.md` specification template and expanded `.specify/templates/plan.md` plan template
 - `speckit.test` command for running project test suites after implementation
 - `kite test`, `kite audit`, and `kite release` commands
 - `.kite/config.yml` defaults for scaffold choices
@@ -22,11 +24,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Workflow reordered: Strategist → Constitution → Specify → Designer → Plan → Tasks → Analyze → Implement → Test → Review → Verify
+- Workflow reordered: Strategist → Discovery → Constitution → Specify → Designer → Plan → Tasks → Analyze → Implement → Test → Review → Verify
 - Workflow gates now include rubric-style checklists in `orchestrator-design-first.yml`
 - Designer now runs after specification (not before)
 - Design direction written to `.specify/memory/design-direction.md`
 - Orchestrator agents list includes all speckit commands
+- `kite install speckit` and `--with-speckit` now ship the bundled specification and planning templates as part of the ready state
 - `kite test` now resolves `smoke`/`standard`/`full` profiles into tiered verification (`unit`, `integration`, `e2e`, `a11y`, `perf`, `security`) and discovers package-manager workspaces plus common monorepo app folders
 - `kite release` now uses `prepare` and `publish` steps with feature-branch gating, publish-time dry runs, and release-note previews sourced from merged PR titles plus `[Unreleased]`
 - installer seeds `.kite/config.yml` without overwriting existing repo-local choices

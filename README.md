@@ -17,6 +17,8 @@ kite install speckit .
 kite status .
 ```
 
+That bootstrap installs Kite's bundled Speckit preset, including the canonical `speckit.discover`, `speckit.constitution`, `speckit.specify`, `speckit.design`, `speckit.plan`, `speckit.implement*`, and `speckit.test` command prompts plus the default artifact templates under `.specify/templates/` such as `spec.md` and `plan.md`.
+
 If you need to copy the workspace assets into an existing repository first, the host-side bootstrap is available as a secondary path. It requires `curl` and `tar` on the host. Add `uvx` or `specify` only if you also want host-side Speckit bootstrap with `--with-speckit`.
 
 ```bash
@@ -55,6 +57,8 @@ kite feature .
 - `.kite/config.yml` for repo-local scaffold and workflow defaults
 - `docs/errors/` for CLI recovery pages linked from failure output
 - `.specify/` assets when you run `kite install speckit` or use `--with-speckit`
+	- bundled command prompts including `speckit.specify` and the design-aware `speckit.plan`
+	- bundled artifact templates including `.specify/templates/spec.md` and `.specify/templates/plan.md`
 
 ## Contributing And License
 

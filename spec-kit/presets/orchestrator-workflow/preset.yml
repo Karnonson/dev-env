@@ -3,8 +3,8 @@ schema_version: "1.0"
 preset:
   id: "orchestrator-workflow"
   name: "Orchestrator Workflow"
-  version: "1.1.0"
-  description: "Design-aware Speckit customization with discovery, constitution, design, plan, and split implementation guidance."
+  version: "1.2.0"
+  description: "Design-aware Speckit customization with discovery, constitution, specify, design, plan, and split implementation guidance."
   author: "Karnon"
   repository: "https://github.com/Karnonson/kite"
   license: "MIT"
@@ -24,6 +24,12 @@ provides:
       file: "commands/speckit.constitution.md"
       description: "Question-first constitution setup tailored to project preferences"
       replaces: "speckit.constitution"
+
+    - type: "command"
+      name: "speckit.specify"
+      file: "commands/speckit.specify.md"
+      description: "Turn the approved discovery and project standards into the canonical feature specification"
+      replaces: "speckit.specify"
 
     - type: "command"
       name: "speckit.design"

@@ -38,6 +38,7 @@ cd "$target_dir"
 
 test -f .specify/presets/orchestrator-workflow/preset.yml
 test -f .specify/presets/orchestrator-workflow/commands/speckit.discover.md
+test -f .specify/presets/orchestrator-workflow/commands/speckit.specify.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.plan.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
@@ -47,17 +48,20 @@ test -f .specify/templates/artifact-front-matter.md
 test -f .specify/templates/discovery.md
 test -f .specify/templates/constitution.md
 test -f .specify/templates/design-direction.md
+test -f .specify/templates/spec.md
 test -f .specify/templates/plan.md
 test -f .specify/templates/test-results.md
 test -f .github/agents/speckit.constitution.agent.md
 test -f .github/agents/speckit.design.agent.md
 test -f .github/agents/speckit.implement.agent.md
+grep -q "approved discovery and project standards" .specify/presets/orchestrator-workflow/commands/speckit.specify.md
 grep -q "feature branch" .specify/presets/orchestrator-workflow/commands/speckit.implement.md
 grep -q "Merge to \`main\` only" .specify/presets/orchestrator-workflow/commands/speckit.implement.md
 grep -q "market-validation.md" .specify/presets/orchestrator-workflow/commands/speckit.discover.md
 grep -q "command: speckit.discover" .specify/workflows/orchestrator-design-first/workflow.yml
 grep -q "command: speckit.plan" .specify/workflows/orchestrator-design-first/workflow.yml
 grep -q "id: start-feature" .specify/workflows/orchestrator-design-first/workflow.yml
+grep -q "Feature Specification" .specify/templates/spec.md
 test -d .specify
 test -d .devcontainer
 test ! -f .devcontainer/switch-profile.sh
@@ -89,7 +93,9 @@ test -d "$partial_target_dir/.devcontainer"
 test -d "$partial_target_dir/.github/prompts"
 test -d "$partial_target_dir/.github/agents"
 test -d "$partial_target_dir/.github/instructions"
+test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.specify.md"
 test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.design.md"
+test -f "$partial_target_dir/.specify/templates/spec.md"
 test -f "$partial_target_dir/.specify/templates/design-direction.md"
 
 (
@@ -103,18 +109,23 @@ bash "$repo_root/install.sh" --force --with-speckit --force-speckit-init --speck
 
 test -f "$partial_target_dir/.github/agents/speckit.constitution.agent.md"
 test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/preset.yml"
+test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.specify.md"
 test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md"
 test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md"
 test ! -d "$partial_target_dir/spec-kit"
 
+printf 'STALE SPEC TEMPLATE\n' > "$partial_target_dir/.specify/templates/spec.md"
 printf 'STALE PLAN TEMPLATE\n' > "$partial_target_dir/.specify/templates/plan.md"
+printf 'STALE SPEC PROMPT\n' > "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.specify.md"
 printf 'STALE PROMPT\n' > "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.plan.md"
 printf 'STALE WORKFLOW\n' > "$partial_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
 
 bash "$repo_root/install.sh" --with-speckit --speckit-version "$speckit_version" --source-dir "$repo_root" "$partial_target_dir"
 
 test ! -f "$partial_target_dir/spec-kit"
+grep -q "approved discovery and project standards" "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.specify.md"
 grep -q "Plan-First Rule" "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.plan.md"
+grep -q "Feature Specification" "$partial_target_dir/.specify/templates/spec.md"
 grep -q "Plan Artifact Template" "$partial_target_dir/.specify/templates/plan.md"
 grep -q 'id: "orchestrator-design-first"' "$partial_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
 
@@ -129,6 +140,7 @@ tar -czf "$archive_path" -C "$repo_root" --null -T "$archive_manifest" --transfo
 DEV_ENV_ARCHIVE_URL="file://$archive_path" bash "$repo_root/install.sh" --with-speckit --speckit-version "$speckit_version" "$archive_target_dir"
 
 test -f "$archive_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
+test -f "$archive_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.specify.md"
 test -f "$archive_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md"
 test -f "$archive_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md"
 
@@ -165,6 +177,8 @@ grep -q '"status":"action-needed"' "$status_json_log"
 )
 
 test -f "$cli_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
+test -f "$cli_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.specify.md"
+test -f "$cli_target_dir/.specify/templates/spec.md"
 test -f "$cli_target_dir/.specify/templates/plan.md"
 test -f "$cli_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md"
 test -f "$cli_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md"
@@ -188,6 +202,101 @@ grep -q "Speckit status: ready" "$status_log"
 )
 grep -q '"state":"bootstrapped"' "$status_json_log"
 grep -q '"status":"ready"' "$status_json_log"
+
+mkdir -p "$cli_target_dir/specs/smoke-spec-flow"
+printf '{"name":"smoke-spec-flow"}\n' > "$cli_target_dir/.specify/feature.json"
+
+(
+  cd "$cli_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" feature --json > "$status_json_log"
+)
+grep -q '"feature":"smoke-spec-flow"' "$status_json_log"
+grep -q '"current_stage":"unknown"' "$status_json_log"
+grep -q '"next_command":"/speckit.discover"' "$status_json_log"
+
+cat > "$cli_target_dir/specs/smoke-spec-flow/discovery.md" <<'EOF'
+---
+stage: discover
+feature: smoke-spec-flow
+status: draft
+owner: Product
+last_agent: speckit.discover
+created_at: 2026-04-25
+updated_at: 2026-04-25
+---
+
+EOF
+cat "$cli_target_dir/.specify/templates/discovery.md" >> "$cli_target_dir/specs/smoke-spec-flow/discovery.md"
+
+(
+  cd "$cli_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" feature --json > "$status_json_log"
+)
+grep -q '"current_stage":"constitution"' "$status_json_log"
+grep -q '"next_command":"/speckit.specify"' "$status_json_log"
+
+cat > "$cli_target_dir/specs/smoke-spec-flow/spec.md" <<'EOF'
+---
+stage: specify
+feature: smoke-spec-flow
+status: draft
+owner: Product
+last_agent: speckit.specify
+created_at: 2026-04-25
+updated_at: 2026-04-25
+---
+
+EOF
+cat "$cli_target_dir/.specify/templates/spec.md" >> "$cli_target_dir/specs/smoke-spec-flow/spec.md"
+
+(
+  cd "$cli_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" feature --json > "$status_json_log"
+)
+grep -q '"current_stage":"specify"' "$status_json_log"
+grep -q '"next_command":"Designer agent or /speckit.design"' "$status_json_log"
+
+cat > "$cli_target_dir/.specify/memory/design-direction.md" <<'EOF'
+---
+stage: design
+feature: smoke-spec-flow
+status: draft
+owner: Designer
+last_agent: speckit.design
+created_at: 2026-04-25
+updated_at: 2026-04-25
+---
+
+EOF
+cat "$cli_target_dir/.specify/templates/design-direction.md" >> "$cli_target_dir/.specify/memory/design-direction.md"
+
+(
+  cd "$cli_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" feature --json > "$status_json_log"
+)
+grep -q '"current_stage":"design"' "$status_json_log"
+grep -q '"next_command":"/speckit.plan"' "$status_json_log"
+
+cat > "$cli_target_dir/specs/smoke-spec-flow/plan.md" <<'EOF'
+---
+stage: plan
+feature: smoke-spec-flow
+status: draft
+owner: Backend Dev
+last_agent: speckit.plan
+created_at: 2026-04-25
+updated_at: 2026-04-25
+---
+
+EOF
+cat "$cli_target_dir/.specify/templates/plan.md" >> "$cli_target_dir/specs/smoke-spec-flow/plan.md"
+
+(
+  cd "$cli_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" feature --json > "$status_json_log"
+)
+grep -q '"current_stage":"plan"' "$status_json_log"
+grep -q '"next_command":"/speckit.tasks"' "$status_json_log"
 
 rm -f "$cli_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.test.md"
 
