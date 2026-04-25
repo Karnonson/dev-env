@@ -5,23 +5,26 @@
 - Treat Speckit as installed when the repo contains `.specify/` and Speckit agents or prompts under `.github/agents/` or `.github/prompts/`.
 - When Speckit is installed, treat `specs/<feature>/discovery.md`, `spec.md`, `plan.md`, and `tasks.md` as the canonical feature artifacts when they exist.
 - Do not create alternate feature specs, plans, or task lists under `team/` when canonical Speckit artifacts already exist.
+- Before writing a canonical artifact under `specs/<feature>/` or `.specify/memory/`, check `.specify/templates/` for the matching template and follow it when present.
 
 ## Agent Workflow
 
 - Prefer the user-level `Orchestrator` agent for end-to-end feature coordination so stage transitions stay consistent.
-- The full SDD cycle is: **Strategist → feature start → speckit.discover → speckit.constitution → speckit.specify → Designer / speckit.design → speckit.plan → speckit.tasks → speckit.analyze → Backend Dev / UI Builder → speckit.test → Code Reviewer → kite verify feature**.
-- Use Strategist to explore and pressure-test ideas first. After approval, start the feature branch and active feature context, then route through `speckit.discover`, `speckit.constitution`, and `speckit.specify` before planning implementation.
-- Designer runs **after** `speckit.specify` to create design direction and brand identity. Designer writes to `.specify/memory/design-direction.md`. UI Builder reads this during implementation.
-- Backend Dev and UI Builder are the primary implementation agents.
-- DevOps handles CI/CD, deployment, infrastructure, and production readiness.
+- `Strategist` is optional pre-workflow discovery support for ambiguous ideas, market-risk checks, or early problem shaping. Once a feature is approved, the formal custom Speckit flow starts at `feature start -> speckit.discover`.
+- The formal SDD cycle is: **feature start -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design (required for frontend or UX-heavy work) -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature**.
+- Discovery must start on the active feature branch, with `.specify/feature.json` aligned to that same feature identifier, never on `main`.
+- Designer runs **after** `speckit.specify` for frontend or UX-heavy work. Use the user's explicit color preferences for the palette, and base the rest of the design system on Material Design 3 principles unless the repo already defines a stronger system. Designer writes to `.specify/memory/design-direction.md`. UI Builder reads this during implementation.
+- Only Backend Dev and UI Builder may propose or apply repository implementation changes. All other agents stay in discovery, research, design, planning, or review mode and hand implementation handoffs back to those specialists.
+- DevOps handles CI/CD, deployment, infrastructure, and production readiness as analysis and handoff guidance unless Backend Dev or UI Builder is explicitly executing the resulting repo changes.
 - If Speckit is not installed yet and a durable idea note is useful before canonical discovery starts, store it under `team/agents/<agent-name>/YYYY-MM-DD-<feature-name>.md`.
-- Once a feature direction is approved, align the feature branch with `.specify/feature.json`, then start the canonical front-of-lifecycle sequence with `speckit.discover`, `speckit.constitution`, and `speckit.specify`.
 - Let Speckit own specification, clarification, planning, tasks, and consistency analysis.
 - Do implementation work on the active feature branch and keep `main` as the merge target only after verification and review are complete.
 - After `speckit.tasks`, implementation agents must execute from the active `tasks.md` and reference relevant FR IDs, user stories, or task IDs from the matching Speckit artifact set.
 - After `speckit.tasks`, prefer `speckit.analyze` before implementation.
 - After implementation, run `speckit.test` to verify all tests pass.
 - After tests pass, prefer `Code Reviewer` before final verification or merge.
+- Every agent should begin meaningful work by sharing a short todo checklist so the user can steer before the task proceeds.
+- Never guess what a user-named technology means. Treat names like `Mastra` as explicit constraints, and ask one clarification question if the role of the technology is still unclear.
 
 ## Document Ownership
 

@@ -3,13 +3,13 @@ schema_version: "1.0"
 
 workflow:
   id: "orchestrator-design-first"
-  name: "Strategist-Led SDD Cycle"
+  name: "Discovery-First SDD Cycle"
   version: "2.2.0"
   author: "Karnon"
-  description: >
-    Strategist -> feature start -> discover -> constitution -> specify -> design ->
-    plan -> tasks -> analyze -> backend -> UI -> test -> review on a
-    feature branch with explicit gates.
+  description: |
+    Optional Strategist -> feature start -> discover -> constitution -> specify
+    -> design -> plan -> tasks -> analyze -> backend -> UI -> test
+    -> review on a feature branch with explicit gates.
 
 requires:
   speckit_version: ">=0.7.0"
@@ -126,6 +126,7 @@ steps:
       - Acceptance criteria are observable and testable.
       - Out-of-scope items are called out.
       - Open questions or assumptions are visible.
+      - If the feature has frontend or UX scope, the next step clearly routes to Designer / speckit.design before planning.
 
       Reject if design or implementation would need to guess core requirements.
     options: [approve, reject]

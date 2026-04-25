@@ -43,6 +43,12 @@ test -f .specify/presets/orchestrator-workflow/commands/speckit.implement.backen
 test -f .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
 test -f .specify/presets/orchestrator-workflow/commands/speckit.test.md
 test -f .specify/workflows/orchestrator-design-first/workflow.yml
+test -f .specify/templates/artifact-front-matter.md
+test -f .specify/templates/discovery.md
+test -f .specify/templates/constitution.md
+test -f .specify/templates/design-direction.md
+test -f .specify/templates/plan.md
+test -f .specify/templates/test-results.md
 test -f .github/agents/speckit.constitution.agent.md
 test -f .github/agents/speckit.design.agent.md
 test -f .github/agents/speckit.implement.agent.md
@@ -84,6 +90,7 @@ test -d "$partial_target_dir/.github/prompts"
 test -d "$partial_target_dir/.github/agents"
 test -d "$partial_target_dir/.github/instructions"
 test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.design.md"
+test -f "$partial_target_dir/.specify/templates/design-direction.md"
 
 (
   cd "$partial_target_dir"
@@ -99,6 +106,17 @@ test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/preset.yml"
 test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md"
 test -f "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md"
 test ! -d "$partial_target_dir/spec-kit"
+
+printf 'STALE PLAN TEMPLATE\n' > "$partial_target_dir/.specify/templates/plan.md"
+printf 'STALE PROMPT\n' > "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.plan.md"
+printf 'STALE WORKFLOW\n' > "$partial_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
+
+bash "$repo_root/install.sh" --with-speckit --speckit-version "$speckit_version" --source-dir "$repo_root" "$partial_target_dir"
+
+test ! -f "$partial_target_dir/spec-kit"
+grep -q "Plan-First Rule" "$partial_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.plan.md"
+grep -q "Plan Artifact Template" "$partial_target_dir/.specify/templates/plan.md"
+grep -q 'id: "orchestrator-design-first"' "$partial_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
 
 mkdir -p "$archive_target_dir"
 while IFS= read -r -d '' repo_file; do
@@ -147,6 +165,7 @@ grep -q '"status":"action-needed"' "$status_json_log"
 )
 
 test -f "$cli_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
+test -f "$cli_target_dir/.specify/templates/plan.md"
 test -f "$cli_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md"
 test -f "$cli_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md"
 
@@ -233,7 +252,10 @@ test -f "$update_target_dir/.specify/presets/orchestrator-workflow/commands/spec
 )
 grep -q "container-native Speckit workflow" "$status_log"
 grep -q "work on a feature branch" "$status_log"
-! grep -q "new <name>" "$status_log"
+if grep -q "new <name>" "$status_log"; then
+  echo "Unexpected legacy new <name> hint in kite status output" >&2
+  exit 1
+fi
 
 (
   cd "$update_target_dir"
@@ -294,3 +316,16 @@ test "$(git -C "$temp_root/master-branch-repo" symbolic-ref --short HEAD)" = "ma
 test "$(git -C "$temp_root/master-branch-repo" config --local init.defaultBranch)" = "main"
 
 echo "Speckit validation passed for version $speckit_version"
+
+
+post_create_target_dir="$temp_root/post-create-project"
+mkdir -p "$post_create_target_dir"
+(
+  cd "$post_create_target_dir"
+  WORKSPACE_FOLDER="$post_create_target_dir" \
+  KITE_SKIP_NODE_BOOTSTRAP=1 KITE_SKIP_UV_BOOTSTRAP=1 KITE_SKIP_KITE_INSTALL=1 \
+    bash "$repo_root/.devcontainer/post-create.sh"
+)
+
+git -C "$post_create_target_dir" rev-parse --git-dir >/dev/null
+grep -q '^refs/heads/main$' <(git -C "$post_create_target_dir" symbolic-ref HEAD)

@@ -16,7 +16,7 @@ Diagnose workflow drift and readiness for this operating model:
 
 - Speckit owns canonical feature artifacts.
 - `Orchestrator` is the global workflow coordinator.
-- `Strategist` clarifies the idea before the Speckit pipeline begins.
+- `Strategist` is optional pre-workflow support for ambiguous ideas; the formal Speckit pipeline begins at `feature start` and `speckit.discover`.
 - `Designer` runs after `speckit.specify` to create design direction and brand identity.
 - `speckit.plan` runs after design and before `speckit.tasks`.
 - `Backend Dev` and `UI Builder` are the primary implementation agents.
@@ -57,7 +57,7 @@ Diagnose workflow drift and readiness for this operating model:
 4. Implementation readiness
 
 - Can a feature move cleanly through this path?
-  `Strategist` -> `feature start` -> `speckit.discover` -> `speckit.constitution` -> `speckit.specify` -> `Designer` -> `speckit.plan` -> `speckit.tasks` -> `speckit.analyze` -> `Backend Dev` / `UI Builder` -> `speckit.test` -> `Code Reviewer` -> `kite verify feature`
+  `feature start` -> `speckit.discover` -> `speckit.constitution` -> `speckit.specify` -> `Designer` (for frontend or UX-heavy work) -> `speckit.plan` -> `speckit.tasks` -> `speckit.analyze` -> `Backend Dev` / `UI Builder` -> `speckit.test` -> `Code Reviewer` -> `kite verify feature`
 - Identify any missing step, missing file, or contradictory rule that breaks this path.
 - If the repo keeps an existing `.devcontainer/`, identify the exact missing contract check instead of recommending blanket replacement.
 
@@ -92,10 +92,10 @@ Return these sections:
 
 - State whether the repo matches this target model:
   - `Orchestrator` coordinates
-  - `Strategist` clarifies ideas first and routes through constitution
-  - `Designer` runs after `speckit.specify` and writes to `.specify/memory/design-direction.md`
+  - `Strategist` is optional idea-shaping support before the formal flow starts at discovery
+  - `Designer` runs after `speckit.specify` for frontend or UX-heavy work, uses the user's color preferences, and writes to `.specify/memory/design-direction.md`
   - `speckit.plan` runs before `speckit.tasks`
-  - `Backend Dev` and `UI Builder` implement
+  - Only `Backend Dev` and `UI Builder` implement repository changes
   - `DevOps` manages CI/CD and deployment
   - `speckit.test` runs after implementation as a test gate
   - `speckit.analyze` runs before implementation as the artifact consistency gate

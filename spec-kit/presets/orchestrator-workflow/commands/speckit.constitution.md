@@ -12,7 +12,7 @@ handoffs:
 $ARGUMENTS
 ```
 
-You MUST collect missing preferences before drafting or updating `.specify/memory/constitution.md`.
+You MUST collect missing preferences before drafting or updating `.specify/memory/constitution.md`. Before asking questions or drafting the artifact, share a short todo checklist so the user can steer the constitution pass.
 
 When clarification is needed, ask exactly one question at a time and wait for the user's answer before asking the next one. Do not send the full question list as a single questionnaire unless the user explicitly asks for that format.
 
@@ -52,6 +52,7 @@ Assistant: What are the non-negotiable engineering standards for code quality, t
   - a feature-branch workflow where work stays off `main` until verification and review are complete
   - review, testing, and document-ownership expectations
 
-5. Update `.specify/memory/constitution.md` in place.
-6. Ensure the file opens with the artifact front matter block described in `spec-kit/templates/artifact-front-matter.md`. Set `stage: constitution`, `last_agent: speckit.constitution`, refresh `updated_at`, and preserve `created_at` if it already exists.
-7. Summarize the resulting principles and any follow-up commands the user should run next.
+5. Before writing, check `.specify/templates/constitution.md` and the rest of `.specify/templates/` for a matching constitution template and follow it when present.
+6. Update `.specify/memory/constitution.md` in place.
+7. Ensure the file opens with the artifact front matter block described in `.specify/templates/artifact-front-matter.md`. Set `stage: constitution`, `last_agent: speckit.constitution`, refresh `updated_at`, and preserve `created_at` if it already exists.
+8. Summarize the resulting principles and any follow-up commands the user should run next.

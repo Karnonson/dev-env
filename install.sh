@@ -77,6 +77,12 @@ has_speckit_templates() {
     .specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md
     .specify/presets/orchestrator-workflow/commands/speckit.test.md
     .specify/workflows/orchestrator-design-first/workflow.yml
+    .specify/templates/artifact-front-matter.md
+    .specify/templates/discovery.md
+    .specify/templates/constitution.md
+    .specify/templates/design-direction.md
+    .specify/templates/plan.md
+    .specify/templates/test-results.md
     .github/agents/speckit.constitution.agent.md
     .github/agents/speckit.design.agent.md
     .github/agents/speckit.implement.agent.md
@@ -339,6 +345,40 @@ ensure_gitignore() {
   } >> "$target_path"
 }
 
+sync_speckit_templates_from_source() {
+  local source_templates="$1/spec-kit/templates"
+  local target_templates="$2/.specify/templates"
+
+  if [[ ! -d "$source_templates" ]]; then
+    return
+  fi
+
+  replace_tree "$source_templates" "$target_templates"
+}
+
+sync_speckit_preset_from_source() {
+  local source_preset="$1/spec-kit/presets/orchestrator-workflow"
+  local target_preset="$2/.specify/presets/orchestrator-workflow"
+
+  if [[ ! -d "$source_preset" ]]; then
+    return
+  fi
+
+  replace_tree "$source_preset" "$target_preset"
+}
+
+sync_speckit_workflow_from_source() {
+  local source_workflow="$1/spec-kit/workflows/orchestrator-design-first.yml"
+  local target_workflow="$2/.specify/workflows/orchestrator-design-first/workflow.yml"
+
+  if [[ ! -f "$source_workflow" ]]; then
+    return
+  fi
+
+  mkdir -p "$(dirname "$target_workflow")"
+  cp "$source_workflow" "$target_workflow"
+}
+
 sync_repo_local_kite_config() {
   local source_config_dir="$1/.kite"
   local target_config_dir="$2/.kite"
@@ -505,6 +545,9 @@ bootstrap_speckit() {
     sync_staged_speckit_bootstrap
   fi
 
+  sync_speckit_preset_from_source "$source_root" "$target_dir"
+  sync_speckit_workflow_from_source "$source_root" "$target_dir"
+  sync_speckit_templates_from_source "$source_root" "$target_dir"
   ensure_git_main_branch_preference
 }
 
@@ -603,9 +646,11 @@ if [[ $dry_run -eq 1 ]]; then
     if [[ $force_speckit_init -eq 1 ]]; then
       echo "  replace preset: orchestrator-workflow -> .specify/presets/"
       echo "  replace workflow: orchestrator-design-first -> .specify/workflows/"
+      echo "  replace templates -> .specify/templates/"
     else
       echo "  merge   preset: orchestrator-workflow -> .specify/presets/"
       echo "  merge   workflow: orchestrator-design-first -> .specify/workflows/"
+      echo "  merge   templates -> .specify/templates/"
     fi
   fi
   exit 0

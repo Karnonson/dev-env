@@ -357,7 +357,7 @@ Default lifecycle:
   feature start -> discover -> constitution -> specify -> design -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release
 
 Stages:
-  discover     Idea and audience exploration (Strategist)
+  discover     Formal discovery artifact (Strategist optional beforehand)
   constitution Project standards and non-negotiables
   specify      Requirements and acceptance criteria
   design       Visual direction and design system
@@ -1886,7 +1886,7 @@ What it is:
   user, outcome, and success signal before technical specification starts.
 
 Who runs it:
-  /speckit.discover after Strategist has pressure-tested the direction.
+  /speckit.discover on the active feature branch. Strategist is optional beforehand when the idea still needs shaping.
   Marketer is optional when audience or market-fit confidence is still weak.
 
 What comes out:
@@ -1924,7 +1924,7 @@ What it is:
   acceptance criteria, and scope boundaries.
 
 Who runs it:
-  /speckit.specify command. Ask clarification questions before writing.
+  /speckit.specify command. Ask clarification questions before writing. Route frontend or UX-heavy work to Designer before planning.
 
 What comes out:
   specs/<feature>/spec.md — the source of truth for what must be built.
