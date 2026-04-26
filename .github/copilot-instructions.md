@@ -7,12 +7,28 @@
 - Do not create alternate feature specs, plans, or task lists under `team/` when canonical Speckit artifacts already exist.
 - Before writing a canonical artifact under `specs/<feature>/` or `.specify/memory/`, check `.specify/templates/` for the matching template and follow it when present.
 
+## Branch and Feature Naming Convention
+
+Every feature MUST use a single canonical identifier (the **feature slug**) consistently across all three locations:
+
+1. **Git branch**: `feature/<slug>` (e.g. `feature/001-vision-agent`). The part after `feature/` is the slug.
+2. **Specs directory**: `specs/<slug>/` (e.g. `specs/001-vision-agent/`).
+3. **Feature context file**: `.specify/feature.json` with `"name": "<slug>"`.
+
+The `kite` CLI resolves the active feature by extracting the last path segment of the branch name (`${branch##*/}`), then looking for `specs/<slug>/`. If any of the three locations uses a different string, downstream agents and `kite feature` will fail to find the active feature context.
+
+When creating a new feature:
+- Choose the slug first (e.g. `001-vision-agent`).
+- Create the branch as `feature/<slug>`.
+- Create `specs/<slug>/` and write `.specify/feature.json` with `"name": "<slug>"` before writing any canonical artifact.
+- Never use bare branch names (e.g. `001-vision-agent` without the `feature/` prefix) or alternative prefixes (e.g. `feat/`, `spec/`).
+
 ## Agent Workflow
 
 - Prefer the user-level `Orchestrator` agent for end-to-end feature coordination so stage transitions stay consistent.
-- `Strategist` is optional pre-workflow discovery support for ambiguous ideas, market-risk checks, or early problem shaping. Once a feature is approved, the formal custom Speckit flow starts at `feature start -> speckit.discover`.
-- The formal SDD cycle is: **feature start -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design (required for frontend or UX-heavy work) -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature**.
-- Discovery must start on the active feature branch, with `.specify/feature.json` aligned to that same feature identifier, never on `main`.
+- `Strategist` is optional pre-workflow discovery support for ambiguous ideas, market-risk checks, or early problem shaping. Once a feature is approved, the formal custom Speckit flow starts at **feature setup** (branch/context alignment) -> `speckit.discover`.
+- The formal SDD cycle is: **feature setup (branch/context alignment) -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design (required for frontend or UX-heavy work) -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature**.
+- Discovery must start on the active feature branch (`feature/<slug>`), with `.specify/feature.json` aligned to that same feature identifier, never on `main`.
 - Designer runs **after** `speckit.specify` for frontend or UX-heavy work. Use the user's explicit color preferences for the palette, and base the rest of the design system on Material Design 3 principles unless the repo already defines a stronger system. Designer writes to `.specify/memory/design-direction.md`. UI Builder reads this during implementation.
 - Only Backend Dev and UI Builder may propose or apply repository implementation changes. All other agents stay in discovery, research, design, planning, or review mode and hand implementation handoffs back to those specialists.
 - DevOps handles CI/CD, deployment, infrastructure, and production readiness as analysis and handoff guidance unless Backend Dev or UI Builder is explicitly executing the resulting repo changes.

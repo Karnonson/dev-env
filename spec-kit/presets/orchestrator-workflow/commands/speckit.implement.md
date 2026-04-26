@@ -27,9 +27,9 @@ Treat `spec.md`, `plan.md`, and `tasks.md` as canonical. Start by sharing a shor
 
 ## Outline
 
-1. Read `.specify/feature.json` to find the active feature directory.
+1. Read `.specify/feature.json` to find the active feature slug. Verify that the current git branch is `feature/<slug>` and that `specs/<slug>/` exists. If the branch, specs directory, or feature.json disagree on the slug, stop and fix the mismatch before proceeding.
 1. Read the active `spec.md`, `plan.md`, `tasks.md`, `.specify/memory/constitution.md`, `.specify/memory/design-direction.md` (when present), and any recent `speckit.analyze` output if it exists.
-1. Confirm the current git branch is the active feature branch. If the repo is on `main`, `master`, or another unrelated branch, create or switch to the correct feature branch before editing.
+1. Confirm the current git branch is `feature/<slug>`. If the repo is on `main`, `master`, or another unrelated branch, switch to the correct feature branch before editing.
 1. Do not begin implementation if `speckit.analyze` has not been run or if unresolved critical consistency issues remain. Stop and tell the user to resolve them first.
 1. Classify pending tasks into backend, UI, and shared buckets.
 1. If the split is ambiguous, ask the user for confirmation before implementation begins.

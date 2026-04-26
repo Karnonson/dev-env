@@ -7,7 +7,7 @@ workflow:
   version: "2.2.0"
   author: "Karnon"
   description: |
-    Optional Strategist -> feature start -> discover -> constitution -> specify
+    Optional Strategist -> feature setup -> discover -> constitution -> specify
     -> design -> plan -> tasks -> analyze -> backend -> UI -> test
     -> review on a feature branch with explicit gates.
 
@@ -40,7 +40,7 @@ steps:
         still need discovery.
       - The feature name describes the outcome, not just an implementation
         detail.
-      - The team wants a guided feature start -> discovery -> Speckit workflow.
+      - The team wants a guided feature setup -> discovery -> Speckit workflow.
 
       Reject if there is not yet a concrete idea to shape.
     options: [approve, abort]
@@ -50,19 +50,18 @@ steps:
     type: gate
     message: |
       Before discovery writes canonical artifacts, start or align the active
-      feature context.
+      feature context using the **feature slug** convention.
 
       Checklist:
-      - The feature identifier is stable enough to use for the canonical
-        `specs/<feature>/` directory.
-      - The current git branch is the feature branch for this work, not
-        `main`, `master`, or an unrelated branch.
-      - `.specify/feature.json` points at the same feature identifier that
-        discovery will write.
-      - The branch and persisted feature context agree before later stages
-        reuse them.
+      - A stable feature slug has been chosen (e.g. `001-vision-agent`).
+      - The current git branch is `feature/<slug>`, not `main`, `master`,
+        a bare slug, or an alternative prefix like `feat/`.
+      - The directory `specs/<slug>/` exists.
+      - `.specify/feature.json` has `"name": "<slug>"` matching exactly.
+      - All three locations (branch, specs dir, feature.json) use the same
+        slug string so `kite feature` and downstream agents resolve correctly.
 
-      Reject if the branch or persisted feature context is not ready.
+      Reject if any naming mismatch exists or the branch is not ready.
     options: [approve, abort]
     on_reject: abort
 

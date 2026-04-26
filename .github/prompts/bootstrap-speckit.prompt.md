@@ -116,12 +116,12 @@ This repo-local alignment should make the repo behave like this:
 
 - Speckit owns the canonical feature lifecycle.
 - `specs/<feature>/discovery.md`, `spec.md`, `plan.md`, and `tasks.md` are canonical when present.
-- `Strategist` is optional pre-workflow support for ambiguous ideas or market validation. The formal artifact workflow starts at `feature start -> speckit.discover`.
+- `Strategist` is optional pre-workflow support for ambiguous ideas or market validation. The formal artifact workflow starts at feature setup (branch/context alignment) -> `speckit.discover`.
 - `Backend Dev` and `UI Builder` are the only implementation agents for repository changes.
 - `Designer` is a required post-specification design stage for frontend, UX, or visual-system work. It uses the user's color preferences and applies MD3 principles to the rest of the design system.
-- The formal lifecycle is `feature start -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design (for frontend or UX-heavy work) -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature`.
+- The formal lifecycle is `feature setup (branch/context alignment) -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design (for frontend or UX-heavy work) -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature`.
 - `brief.md` is not part of the default lifecycle or canonical artifact set.
-- Before discovery writes canonical artifacts, the feature branch and `.specify/feature.json` must be aligned to the same feature identifier, and discovery must never start on `main`.
+- Before discovery writes canonical artifacts, the feature branch must follow the `feature/<slug>` convention (e.g. `feature/001-vision-agent`), `specs/<slug>/` must exist, and `.specify/feature.json` must have `"name": "<slug>"`. All three must use the same slug. Discovery must never start on `main`.
 - Every agent must begin meaningful work with a short todo checklist.
 - Before a canonical artifact is written, the agent must check `.specify/templates/` for a matching template and follow it when present.
 - Agents must not guess what a user-named technology means; they must ask if the role of a framework such as `Mastra` is unclear.
@@ -150,9 +150,10 @@ If `.github/copilot-instructions.md` does not exist, create it with this baselin
 ## Agent Workflow
 
 - Prefer the user-level `Orchestrator` agent for end-to-end feature coordination so stage transitions stay consistent.
-- `Strategist` is optional pre-workflow support for ambiguous ideas or market validation. Once the feature is approved, the formal custom Speckit flow starts at `feature start -> speckit.discover`.
-- The formal SDD cycle is: `feature start -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design (for frontend or UX-heavy work) -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature`.
-- Discovery must begin on the active feature branch with `.specify/feature.json` aligned to the same feature identifier.
+- `Strategist` is optional pre-workflow support for ambiguous ideas or market validation. Once the feature is approved, the formal custom Speckit flow starts at feature setup (branch/context alignment) -> `speckit.discover`.
+- The formal SDD cycle is: `feature setup (branch/context alignment) -> speckit.discover -> speckit.constitution -> speckit.specify -> Designer / speckit.design (for frontend or UX-heavy work) -> speckit.plan -> speckit.tasks -> speckit.analyze -> Backend Dev / UI Builder -> speckit.test -> Code Reviewer -> kite verify feature`.
+- Every feature uses a single canonical slug consistently across the branch (`feature/<slug>`), `specs/<slug>/`, and `.specify/feature.json` (`"name": "<slug>"`). Never use bare slugs as branch names or alternative prefixes.
+- Discovery must begin on the active feature branch (`feature/<slug>`) with `.specify/feature.json` aligned to the same slug.
 - Designer runs **after** `speckit.specify` for frontend or UX-heavy work. Designer uses the user's color preferences and applies MD3 principles to the rest of the design system. Designer writes to `.specify/memory/design-direction.md`. UI Builder reads this during implementation.
 - Only Backend Dev and UI Builder may propose or apply repository implementation changes.
 - DevOps handles CI/CD, deployment, infrastructure, and production readiness as advisory guidance unless Backend Dev or UI Builder is explicitly applying the resulting repo changes.

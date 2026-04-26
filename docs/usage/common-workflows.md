@@ -85,6 +85,6 @@ kite explain constitution
 kite explain plan
 ```
 
-The default progression is `feature start -> discover -> constitution -> specify -> design when needed -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release`. For backend-only or CLI work, create `.specify/memory/design-skipped.md` if you want `kite feature` to move straight from specification to planning before any later artifacts exist. Legacy repositories may still contain a `brief.md` artifact on disk, but it is not part of the recommended default flow.
+The default progression is `feature setup (branch/context alignment) -> discover -> constitution -> specify -> design when needed -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release`. For backend-only or CLI work, create `.specify/memory/design-skipped.md` if you want `kite feature` to move straight from specification to planning before any later artifacts exist. Legacy repositories may still contain a `brief.md` artifact on disk, but it is not part of the recommended default flow.
 
 This is useful for onboarding or for non-technical collaborators who need the intent of a stage without opening the underlying prompt or workflow files.

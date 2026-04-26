@@ -33,9 +33,11 @@ Assistant: What specific outcome should improve for them?
 
 1. Identify the canonical feature identifier from the user input. If the name is still ambiguous, ask exactly one question to choose a stable identifier, then wait for the answer before continuing.
 2. Before writing any canonical artifact, start or align the active feature context:
-  - ensure the current git branch is the correct feature branch for this work, not `main`, `master`, or an unrelated branch
-  - when the repo uses numbered Speckit-style feature names, keep that same identifier across the branch, `specs/<feature>/`, and `.specify/feature.json`
-  - ensure `.specify/feature.json` exists and its `name` matches the feature identifier that discovery will write
+  - choose a stable **feature slug** for this work (e.g. `001-vision-agent`). When the repo uses numbered Speckit-style feature names, continue that numbering scheme.
+  - ensure the current git branch follows the convention `feature/<slug>` (e.g. `feature/001-vision-agent`). If no matching branch exists, create it from `main`. Never use bare slugs as branch names, alternative prefixes like `feat/` or `spec/`, or work directly on `main` or `master`.
+  - ensure the directory `specs/<slug>/` exists.
+  - ensure `.specify/feature.json` exists and its `"name"` field matches the slug exactly. Create it if missing: `{"name": "<slug>"}`.
+  - the `kite` CLI resolves the active feature by extracting the last path segment of the branch name and matching it to `specs/<slug>/`. If the branch, `specs/` directory, and `.specify/feature.json` do not all use the same slug, downstream agents will fail to find the feature context.
   - if the branch and persisted feature context disagree, fix the mismatch before continuing
 3. Read repository context that can shape discovery, including `README.md`, `.github/copilot-instructions.md`, and any product or architecture docs that already describe the audience or business context.
 4. Run a short discovery interview. When information is missing, ask exactly one clarifying question per turn. After each answer, decide whether another question is still required. Ask only the minimum questions needed to capture:

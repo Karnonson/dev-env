@@ -92,8 +92,8 @@ When Speckit is not installed:
 
 ## Routing Rules
 
-1. Use `Strategist` only when the idea is still ambiguous, the user wants market validation, or the repo needs pre-discovery problem shaping. If the feature is already approved, skip Strategist and start the formal flow at `feature start` plus `speckit.discover`.
-2. After an idea is approved, align the feature branch and active feature context, then route to `speckit.discover`. Discovery is the first formal artifact stage of this workflow.
+1. Use `Strategist` only when the idea is still ambiguous, the user wants market validation, or the repo needs pre-discovery problem shaping. If the feature is already approved, skip Strategist and start the formal flow at feature setup (branch/context alignment) plus `speckit.discover`.
+2. After an idea is approved, choose a stable feature slug (e.g. `001-vision-agent`). Create the branch as `feature/<slug>`, ensure `specs/<slug>/` exists, and write `.specify/feature.json` with `"name": "<slug>"` so that the branch, specs directory, and feature context file all use the same slug. Then route to `speckit.discover`. Discovery is the first formal artifact stage of this workflow.
 3. After discovery is approved, route to `speckit.constitution` to lock project standards and guardrails.
 4. An approved idea that needs canonical artifacts in a Speckit repo goes to `speckit.specify`. If the feature includes frontend, UX, or visual work, route to Designer or `speckit.design` immediately after specification and before `speckit.plan`.
 5. Designer creates the design system, brand identity, and visual direction **after** the spec exists. Designer uses the user's color preferences as direct inputs and applies MD3 principles to the rest of the design system. Designer writes design direction to `.specify/memory/design-direction.md`. UI Builder reads this during implementation.

@@ -19,7 +19,7 @@ The active feature is detected from `.specify/feature.json`, the current Git bra
 
 ## Lifecycle Notes
 
-The default lifecycle shown in the recommendation line is `feature start -> discover -> constitution -> specify -> design when needed -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release`.
+The default lifecycle shown in the recommendation line is `feature setup (branch/context alignment) -> discover -> constitution -> specify -> design when needed -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release`.
 
 For backend-only or CLI features, create `.specify/memory/design-skipped.md` when you want to skip design explicitly before planning. If `plan.md` or a later artifact already exists, `kite feature` infers that design was intentionally skipped and stops blocking on it.
 

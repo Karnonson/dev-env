@@ -16,7 +16,7 @@ Diagnose workflow drift and readiness for this operating model:
 
 - Speckit owns canonical feature artifacts.
 - `Orchestrator` is the global workflow coordinator.
-- `Strategist` is optional pre-workflow support for ambiguous ideas; the formal Speckit pipeline begins at `feature start` and `speckit.discover`.
+- `Strategist` is optional pre-workflow support for ambiguous ideas; the formal Speckit pipeline begins at feature setup (branch/context alignment) and `speckit.discover`.
 - `Designer` runs after `speckit.specify` to create design direction and brand identity.
 - `speckit.plan` runs after design and before `speckit.tasks`.
 - `Backend Dev` and `UI Builder` are the primary implementation agents.
@@ -44,9 +44,10 @@ Diagnose workflow drift and readiness for this operating model:
 - Does it mention Speckit artifact ownership?
 - Does it point to `Orchestrator` rather than `Feature Workflow`?
 - Does it state that `Backend Dev` and `UI Builder` are the primary implementation agents?
-- Does it place `Designer` as an optional post-specification design stage?
+- For frontend, UX-heavy, or visual-system work, does it place `Designer` as the required post-specification design stage before planning?
 - Does it include `speckit.plan` between design and tasks?
 - Does it avoid requiring `brief.md` as part of the default lifecycle?
+- Does it enforce a single feature slug across `feature/<slug>`, `specs/<slug>/`, and `.specify/feature.json`?
 
 3. Stale or conflicting workflow setup
 
@@ -57,7 +58,7 @@ Diagnose workflow drift and readiness for this operating model:
 4. Implementation readiness
 
 - Can a feature move cleanly through this path?
-  `feature start` -> `speckit.discover` -> `speckit.constitution` -> `speckit.specify` -> `Designer` (for frontend or UX-heavy work) -> `speckit.plan` -> `speckit.tasks` -> `speckit.analyze` -> `Backend Dev` / `UI Builder` -> `speckit.test` -> `Code Reviewer` -> `kite verify feature`
+  feature setup (branch/context alignment) -> `speckit.discover` -> `speckit.constitution` -> `speckit.specify` -> `Designer` (for frontend or UX-heavy work) -> `speckit.plan` -> `speckit.tasks` -> `speckit.analyze` -> `Backend Dev` / `UI Builder` -> `speckit.test` -> `Code Reviewer` -> `kite verify feature`
 - Identify any missing step, missing file, or contradictory rule that breaks this path.
 - If the repo keeps an existing `.devcontainer/`, identify the exact missing contract check instead of recommending blanket replacement.
 

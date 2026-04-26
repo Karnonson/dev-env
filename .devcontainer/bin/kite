@@ -354,7 +354,7 @@ shows: what happens, who runs it, what artifact it produces, and
 what to do next.
 
 Default lifecycle:
-  feature start -> discover -> constitution -> specify -> design (when needed) -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release
+  feature setup (branch/context alignment) -> discover -> constitution -> specify -> design (when needed) -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release
 
 Stages:
   discover     Formal discovery artifact (Strategist optional beforehand)
@@ -1881,14 +1881,14 @@ run_feature_status() {
     if [[ "$as_json" -eq 1 ]]; then
       printf '{"status":"no-active-feature","branch":%s,"hint":%s}\n' \
         "$(json_escape "$branch")" \
-        "$(json_escape "Run kite install speckit ., align the feature branch and .specify/feature.json, then /speckit.discover \"your feature idea\".")"
+        "$(json_escape "Run kite install speckit ., choose a feature slug, align feature/<slug>, specs/<slug>/, and .specify/feature.json, then /speckit.discover \"your feature idea\".")"
     else
       echo "No active Speckit feature detected."
       echo ""
       echo "Hints:"
       echo "  - Current branch: ${branch:-<none>}"
       echo "  - Run: kite install speckit ."
-      echo "  - Align the feature branch and .specify/feature.json"
+      echo "  - Choose a feature slug and align feature/<slug>, specs/<slug>/, and .specify/feature.json"
       echo "  - Then: /speckit.discover \"your feature idea\""
     fi
     return 0

@@ -37,6 +37,17 @@ User: Yes, ship it behind a feature flag.
 Assistant: Are there any cross-team dependencies that affect sequencing?
 ```
 
+## Research Delegation
+
+Before finalizing architecture and technology decisions that were not explicitly chosen by the user, delegate to the `Researcher` agent to verify:
+
+- current best practices and recommended patterns for the key frameworks and libraries in the plan
+- known pitfalls, breaking changes, or deprecations for the chosen stack versions
+- security-sensitive patterns when auth, data handling, or external integrations are involved
+- any framework-specific project structure conventions that should shape the plan
+
+Do NOT finalize the architecture sections of the plan until the researcher returns `[VERIFIED]` or `[LIKELY]` findings with references. Persist substantial research output in `specs/<feature>/research.md`.
+
 ## Outline
 
 1. Read the active `specs/<feature>/spec.md`.
@@ -57,13 +68,18 @@ Assistant: Are there any cross-team dependencies that affect sequencing?
   - rollout, migration, and operational considerations when relevant
   - open risks, assumptions, and mitigations
   - a direct handoff to `speckit.tasks`
-9. When information is missing, ask exactly one clarifying question per turn to remove ambiguity around architecture, sequencing, dependencies, verification, delivery risk, rollout constraints, and the role of user-specified technologies.
-10. When the plan exposes unknowns that materially affect delivery, resolve them inside the planning pass and persist the durable outcome in the smallest supporting artifact that helps execution:
+9. **Architecture and technology justification.** For every architecture or technology decision in the plan:
+  - If the user explicitly chose the technology, treat it as authoritative and do not second-guess it. Ask one clarification question if its role is unclear.
+  - If the technology was not explicitly chosen by the user, justify the selection with concrete reasoning: why this choice over alternatives, what trade-offs were considered, and how it serves the feature requirements and user context.
+  - Delegate to `Researcher` to verify current best practices, recommended patterns, and known pitfalls for the key frameworks and libraries the plan depends on. Do not finalize architecture sections until the researcher returns findings. Persist the durable research output in `specs/<feature>/research.md` when the findings are substantial enough to inform implementation.
+  - Surface the justification visibly in the plan under a dedicated **Architecture Decisions** or **Technology Rationale** section so reviewers can challenge choices before implementation starts.
+10. When information is missing, ask exactly one clarifying question per turn to remove ambiguity around architecture, sequencing, dependencies, verification, delivery risk, rollout constraints, and the role of user-specified technologies.
+11. When the plan exposes unknowns that materially affect delivery, resolve them inside the planning pass and persist the durable outcome in the smallest supporting artifact that helps execution:
   - `research.md` for decisions, rationale, and rejected alternatives
   - `data-model.md` for entities, validation rules, and state transitions
   - `contracts/` for external or cross-boundary interfaces
   - `quickstart.md` for feature-specific setup or verification flows
-11. When `.specify/memory/design-direction.md` exists, fold those design requirements into the affected plan sections instead of treating them as a parallel planning artifact.
-12. Open `specs/<feature>/plan.md` with the artifact front matter block described in `.specify/templates/artifact-front-matter.md`. Set `stage: plan`, `last_agent: speckit.plan`, refresh `updated_at`, and preserve `created_at` if it already exists.
-13. Keep the plan implementation-ready and decision-oriented. Do not create a second backlog or a default `team/agents` planning artifact.
-14. End with a concise handoff summary for `speckit.tasks`.
+12. When `.specify/memory/design-direction.md` exists, fold those design requirements into the affected plan sections instead of treating them as a parallel planning artifact.
+13. Open `specs/<feature>/plan.md` with the artifact front matter block described in `.specify/templates/artifact-front-matter.md`. Set `stage: plan`, `last_agent: speckit.plan`, refresh `updated_at`, and preserve `created_at` if it already exists.
+14. Keep the plan implementation-ready and decision-oriented. Do not create a second backlog or a default `team/agents` planning artifact.
+15. End with a concise handoff summary for `speckit.tasks`.

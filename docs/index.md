@@ -32,7 +32,7 @@ Supported Kite workflows run inside a container that either uses the bundled `ba
 - [kite feature](reference/feature.md)
 - [kite explain](reference/explain.md)
 
-The recommended lifecycle is `feature start -> discover -> constitution -> specify -> design when needed -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release`. Legacy repos may still contain a `brief.md` artifact on disk, but the supported flow does not use it.
+The recommended lifecycle is `feature setup (branch/context alignment) -> discover -> constitution -> specify -> design when needed -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release`. Legacy repos may still contain a `brief.md` artifact on disk, but the supported flow does not use it.
 
 ### Shell integration and help
 

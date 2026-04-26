@@ -52,6 +52,11 @@ specs/[feature-name]/
 
 **Structure Decision**: [Explain which directories are in scope and why]
 
+## Technology Rationale
+
+- [For each non-user-selected framework, library, or architecture choice: why this option was chosen over the main alternatives]
+- [Summarize current best-practice guidance or link to `research.md` when the decision needed separate validation]
+
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
@@ -67,6 +72,7 @@ specs/[feature-name]/
 
 - [Key technical decisions]
 - [Data flow, API, schema, or integration impacts]
+- [Call out user-mandated technology choices separately from planner-selected choices]
 
 ## Dependencies And Handoffs
 

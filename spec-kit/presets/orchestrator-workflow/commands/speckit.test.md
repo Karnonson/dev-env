@@ -15,9 +15,9 @@ $ARGUMENTS
 ## Outline
 
 1. Share a short todo checklist before running verification so the user can steer the test pass.
-2. Read `.specify/feature.json` to locate the active feature directory.
+2. Read `.specify/feature.json` to locate the active feature slug. Verify that the current git branch is `feature/<slug>` and that `specs/<slug>/` exists. If the branch, specs directory, or feature.json disagree on the slug, stop and fix the mismatch before proceeding.
 3. Load the active `spec.md`, `plan.md`, `tasks.md`, `.specify/memory/constitution.md`, and `.kite/config.yml` when present.
-4. Confirm the current git branch is the active feature branch. Do not run tests on `main` or `master` unless explicitly asked.
+4. Confirm the current git branch is `feature/<slug>`. Do not run tests on `main`, `master`, or an unrelated branch unless explicitly asked.
 5. Resolve the required verification scope in this order:
    - explicit user-requested tiers or profiles from `$ARGUMENTS`
    - constitution-required verification defaults or mandatory extra tiers

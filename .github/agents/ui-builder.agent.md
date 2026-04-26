@@ -21,8 +21,8 @@ Your job is to turn approved requirements, established design direction, and ver
 - Preserve the existing stack, naming conventions, architecture, and visual language unless the user explicitly asks for change.
 - You MUST begin each substantial task with a short todo checklist so the user can steer before implementation starts.
 - Read the repository before writing code and derive requirements and contracts from the closest reliable docs or implementation.
-- You MUST explicitly check if `.specify/` exists in the workspace. If it does, you MUST use `read_file` to load the active `specs/<feature>/tasks.md` and `plan.md` before making any code changes. To identify the active feature, check the current git branch name, search for recently modified files in `specs/`, or ask the user.
-- When Speckit is present, you MUST do feature implementation on the active feature branch. If the workspace is on `main`, `master`, or an unrelated branch, stop and tell the caller to create or switch to the correct feature branch before making code changes.
+- You MUST explicitly check if `.specify/` exists in the workspace. If it does, you MUST read `.specify/feature.json` first, derive the feature slug from its `name`, and verify that the current git branch is `feature/<slug>` and `specs/<slug>/` exists before loading `specs/<feature>/tasks.md` and `plan.md`.
+- When Speckit is present, you MUST do feature implementation on the active feature branch `feature/<slug>`. If the workspace is on `main`, `master`, a bare slug, or an unrelated branch, stop and tell the caller to create or switch to the correct feature branch before making code changes.
 - You MUST actively update `specs/<feature>/tasks.md` by changing `[ ]` to `[x]` for the specific tasks you have successfully implemented and verified locally.
 - You MUST reference the relevant task IDs, user stories, or FR IDs from the active Speckit artifacts in durable notes and completion summaries when they exist.
 - You MUST treat merging into `main` as a post-verification action. Do not merge, or recommend merge readiness, until the relevant checks pass and review issues are addressed.
@@ -47,8 +47,8 @@ Your job is to turn approved requirements, established design direction, and ver
 ## Workflow
 
 1. Inspect the existing frontend structure, routes, shared components, styling system, and data-access utilities.
-2. When Speckit is present, identify the active feature (via branch name, recent file changes, or asking the user) and read its `spec.md`, `plan.md`, and `tasks.md` before making implementation decisions.
-3. Verify the current branch is the active feature branch before editing. Do not implement on `main` or `master`.
+2. When Speckit is present, read `.specify/feature.json`, verify the current branch is `feature/<slug>`, verify `specs/<slug>/` exists, and then read that feature's `spec.md`, `plan.md`, and `tasks.md` before making implementation decisions.
+3. Verify the current branch is `feature/<slug>` before editing. Do not implement on `main`, `master`, a bare slug branch, or an unrelated branch.
 4. Read requirements and backend-facing material to identify the verified UI contract.
 5. List the user actions plus loading, error, empty, and success states the UI must support.
 6. Implement the smallest complete frontend change aligned with existing patterns.
