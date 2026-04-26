@@ -59,8 +59,8 @@ kite feature .
 - `.kite/config.yml` for repo-local scaffold and workflow defaults
 - `docs/errors/` for CLI recovery pages linked from failure output
 - `.specify/` assets when you run `kite install speckit` or use `--with-speckit`
-	- bundled command prompts including `speckit.specify` and the design-aware `speckit.plan`
-	- bundled artifact templates including `.specify/templates/spec.md` and `.specify/templates/plan.md`
+  - bundled command prompts including `speckit.specify` and the design-aware `speckit.plan`
+  - bundled artifact templates including `.specify/templates/spec.md` and `.specify/templates/plan.md`
 
 ## Contributing And License
 
