@@ -25,7 +25,7 @@ Use this structure for `specs/<feature>/plan.md` when no stronger repo-specific 
 
 ## Constitution Check
 
-*GATE: Must pass before the plan is finalized and again whenever later changes materially alter scope.*
+_GATE: Must pass before the plan is finalized and again whenever later changes materially alter scope._
 
 - [List the constitutional rules this plan must satisfy]
 - [Note any justified exception and why a simpler approach was rejected]
@@ -59,8 +59,8 @@ specs/[feature-name]/
 
 ## Complexity Tracking
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
+| Violation                      | Why Needed     | Simpler Alternative Rejected Because   |
+| ------------------------------ | -------------- | -------------------------------------- |
 | [e.g., extra service boundary] | [current need] | [why the simpler path is insufficient] |
 
 ## Delivery Phases

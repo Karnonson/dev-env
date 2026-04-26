@@ -80,10 +80,10 @@ Operational rules:
 - If `.devcontainer/` already exists, preserve it by default. Do not recommend replacing `devcontainer.json`, `Dockerfile`, or other repo-owned container files unless I explicitly ask for the bundled Kite container or an explicit force path.
 - The supported brownfield path is: keep the existing `.devcontainer/`, install the Kite workflow assets, and validate the minimum Kite container contract after reopening in the container.
 - Minimum Kite container contract:
-   - `kite` is available on `PATH` inside the container.
-   - Required post-create setup has run, or equivalent tooling is present inside the container.
-   - The workspace-level `.github/` customizations are installed.
-   - `specify version`, `kite doctor .`, and the bundled Speckit bootstrap path work inside the container.
+  - `kite` is available on `PATH` inside the container.
+  - Required post-create setup has run, or equivalent tooling is present inside the container.
+  - The workspace-level `.github/` customizations are installed.
+  - `specify version`, `kite doctor .`, and the bundled Speckit bootstrap path work inside the container.
 - If the contract is incomplete, explain the exact missing piece and the smallest validation or remediation command instead of treating the existing `.devcontainer/` as a hard blocker.
 
 ### 2.5 Install my local preset when available
@@ -226,4 +226,7 @@ Report:
    - `/speckit.constitution`
    - `/speckit.specify`
    - use `Orchestrator` for orchestration
+
+```
+
 ```

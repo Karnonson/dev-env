@@ -80,12 +80,11 @@ When the task requires new endpoints, database logic, or server workflows, STOP.
 - Update the existing feature document when continuing the same task.
 - Treat these notes as supporting records only; do not duplicate canonical requirements already captured in Speckit artifacts.
 - Structure the document with only the sections needed for the task:
-	- Summary
-	- Requirements
-	- Design Notes
-	- Component or Route Changes
-	- Backend Contract
-	- Risks
-	- Verification
+  - Summary
+  - Requirements
+  - Design Notes
+  - Component or Route Changes
+  - Backend Contract
+  - Risks
+  - Verification
 - Do not create a new document for small fixes unless the user asks for one or the change needs a durable record.
-

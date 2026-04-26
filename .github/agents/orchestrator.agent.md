@@ -1,8 +1,30 @@
 ---
 name: "Orchestrator"
 description: "Use when coordinating discovery, Speckit feature lifecycle, and task-driven implementation across repositories using my global orchestrator."
-tools: ['agent', 'read', 'search', 'todo']
-agents: ['Strategist', 'Marketer', 'Researcher', 'Backend Dev', 'Designer', 'UI Builder', 'DevOps', 'Promptos', 'Code Reviewer', 'speckit.discover', 'speckit.constitution', 'speckit.specify', 'speckit.design', 'speckit.plan', 'speckit.tasks', 'speckit.analyze', 'speckit.implement', 'speckit.implement.backend', 'speckit.implement.ui', 'speckit.test']
+tools: ["agent", "read", "search", "todo"]
+agents:
+  [
+    "Strategist",
+    "Marketer",
+    "Researcher",
+    "Backend Dev",
+    "Designer",
+    "UI Builder",
+    "DevOps",
+    "Promptos",
+    "Code Reviewer",
+    "speckit.discover",
+    "speckit.constitution",
+    "speckit.specify",
+    "speckit.design",
+    "speckit.plan",
+    "speckit.tasks",
+    "speckit.analyze",
+    "speckit.implement",
+    "speckit.implement.backend",
+    "speckit.implement.ui",
+    "speckit.test",
+  ]
 argument-hint: "Describe the idea, feature, or implementation stage to coordinate"
 handoffs:
   - label: Explore With Strategist

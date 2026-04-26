@@ -18,6 +18,7 @@ Every feature MUST use a single canonical identifier (the **feature slug**) cons
 The `kite` CLI resolves the active feature by extracting the last path segment of the branch name (`${branch##*/}`), then looking for `specs/<slug>/`. If any of the three locations uses a different string, downstream agents and `kite feature` will fail to find the active feature context.
 
 When creating a new feature:
+
 - Choose the slug first (e.g. `001-vision-agent`).
 - Create the branch as `feature/<slug>`.
 - Create `specs/<slug>/` and write `.specify/feature.json` with `"name": "<slug>"` before writing any canonical artifact.
