@@ -33,3 +33,5 @@ kite audit --fix .
 ## Notes
 
 Use this command directly when you want security checks without the rest of the release flow.
+
+Python audits ignore common toolchain packages (`pip`, `setuptools`, and `wheel`) by default so environment-managed CVEs do not block release gates. Extend that list in `.kite/config.yml` under `audit.python.ignore_packages` when your workspace needs extra exclusions.

@@ -247,7 +247,7 @@ Options:
 
 Checks:
   - Committed .env files with potential secrets
-  - Python dependency vulnerabilities (pip-audit)
+  - Python dependency vulnerabilities (pip-audit, with toolchain-package filtering)
   - JavaScript dependency vulnerabilities (npm/pnpm audit)
 
 Monorepo support:
@@ -325,8 +325,8 @@ Usage:
 One-screen status view for the active Speckit feature.
 
 Shows:
-  - Feature name, branch, and current lifecycle stage
-  - Checklist of canonical artifacts (done vs pending)
+  - Feature name, branch, current stage, and next lifecycle stage
+  - Checklist of canonical artifacts (done, pending, or skipped)
   - Last 3 artifacts changed (by modification time)
   - Single recommended next action
 
@@ -354,13 +354,13 @@ shows: what happens, who runs it, what artifact it produces, and
 what to do next.
 
 Default lifecycle:
-  feature start -> discover -> constitution -> specify -> design -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release
+  feature start -> discover -> constitution -> specify -> design (when needed) -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release
 
 Stages:
   discover     Formal discovery artifact (Strategist optional beforehand)
   constitution Project standards and non-negotiables
   specify      Requirements and acceptance criteria
-  design       Visual direction and design system
+  design       Visual direction and design system (optional for backend-only work)
   plan         Technical plan and architecture
   tasks        Task breakdown with IDs
   analyze      Consistency and coverage analysis
@@ -812,6 +812,13 @@ scaffold:
 workflow:
   test_tier: $test_tier
 
+audit:
+  python:
+    ignore_packages:
+      - pip
+      - setuptools
+      - wheel
+
 deploy:
   target: $deploy_target
 EOF
@@ -905,6 +912,161 @@ read_kite_test_profile() {
   else
     printf 'standard\n'
   fi
+}
+
+read_kite_python_audit_ignore_packages() {
+  local config_file="$1/.kite/config.yml"
+
+  printf '%s\n' pip setuptools wheel
+
+  if [[ -f "$config_file" ]]; then
+    awk '
+      /^[[:space:]]*audit:[[:space:]]*$/ {
+        in_audit = 1
+        in_python = 0
+        in_ignore = 0
+        next
+      }
+      in_audit && /^[^[:space:]]/ {
+        in_audit = 0
+        in_python = 0
+        in_ignore = 0
+      }
+      in_audit && /^[[:space:]]*python:[[:space:]]*$/ {
+        in_python = 1
+        in_ignore = 0
+        next
+      }
+      in_audit && in_python && /^[[:space:]]*ignore_packages:[[:space:]]*$/ {
+        in_ignore = 1
+        next
+      }
+      in_audit && in_python && in_ignore {
+        if ($0 ~ /^[[:space:]]*-[[:space:]]*/) {
+          sub(/^[[:space:]]*-[[:space:]]*/, "", $0)
+          gsub(/["'\''[:space:]]/, "", $0)
+          if (length($0) > 0) {
+            print tolower($0)
+          }
+          next
+        }
+        if ($0 !~ /^[[:space:]]+/) {
+          in_ignore = 0
+        }
+      }
+    ' "$config_file"
+  fi | awk 'NF && !seen[$0]++ { print $0 }'
+}
+
+run_python_dependency_audit() {
+  local project_root="$1"
+  local fix_mode="$2"
+  local -a audit_cmd=() ignored_packages=()
+  local output_file error_file parsed_output audit_status=0 parser_status=0
+
+  while IFS= read -r package_name; do
+    [[ -n "$package_name" ]] || continue
+    ignored_packages+=("$package_name")
+  done < <(read_kite_python_audit_ignore_packages "$target_dir")
+
+  if command -v uvx >/dev/null 2>&1; then
+    audit_cmd=(uvx pip-audit)
+  elif command -v pip-audit >/dev/null 2>&1; then
+    audit_cmd=(pip-audit)
+  else
+    echo "[info] pip-audit not available. Install with: uvx pip-audit"
+    return 0
+  fi
+
+  if [[ "$fix_mode" -eq 1 ]]; then
+    audit_cmd+=(--fix)
+  fi
+  audit_cmd+=(-f json)
+
+  output_file="$(mktemp "${TMPDIR:-$project_root}/kite-audit.out.XXXXXX")"
+  error_file="$(mktemp "${TMPDIR:-$project_root}/kite-audit.err.XXXXXX")"
+
+  if ! (cd "$project_root" && "${audit_cmd[@]}" >"$output_file" 2>"$error_file"); then
+    audit_status=$?
+  fi
+
+  parsed_output="$(python3 - "$output_file" "${ignored_packages[@]}" <<'PY'
+import json
+import pathlib
+import sys
+
+output_path = pathlib.Path(sys.argv[1])
+ignored = {value.lower() for value in sys.argv[2:]}
+
+try:
+    raw = output_path.read_text()
+    payload = json.loads(raw)
+except Exception as exc:  # pragma: no cover - shell validation path
+    print(f"JSON_PARSE_ERROR:{exc}")
+    sys.exit(2)
+
+dependencies = payload.get("dependencies") if isinstance(payload, dict) else payload
+if not isinstance(dependencies, list):
+    print("JSON_PARSE_ERROR:unexpected-schema")
+    sys.exit(2)
+
+ignored_findings = []
+remaining_findings = []
+
+for dependency in dependencies:
+    if not isinstance(dependency, dict):
+        continue
+    name = str(dependency.get("name", "unknown"))
+    version = str(dependency.get("version", "unknown"))
+    vulns = dependency.get("vulns") or []
+    if not vulns:
+        continue
+    record = (name, version, vulns)
+    if name.lower() in ignored:
+        ignored_findings.append(record)
+    else:
+        remaining_findings.append(record)
+
+if ignored_findings:
+    packages = ", ".join(sorted({name for name, _, _ in ignored_findings}))
+    print(f"[info] Ignored Python audit findings for toolchain packages: {packages}")
+    for name, version, vulns in ignored_findings:
+      ids = ", ".join(str(vuln.get("id", "unknown")) for vuln in vulns)
+      print(f"  - {name} {version}: {ids}")
+
+if remaining_findings:
+    print("[warn] Python dependency audit findings:")
+    for name, version, vulns in remaining_findings:
+        for vuln in vulns:
+            vuln_id = str(vuln.get("id", "unknown"))
+            fix_versions = vuln.get("fix_versions") or []
+            aliases = vuln.get("aliases") or []
+            line = f"  - {name} {version}: {vuln_id}"
+            if fix_versions:
+                line += f" (fix: {', '.join(str(value) for value in fix_versions)})"
+            if aliases:
+                line += f" [aliases: {', '.join(str(value) for value in aliases)}]"
+            print(line)
+    sys.exit(1)
+
+print("[ok] Python dependency audit clean")
+PY
+)"
+  parser_status=$?
+
+  if [[ "$parser_status" -eq 2 ]]; then
+    cat "$error_file"
+    cat "$output_file"
+    rm -f "$output_file" "$error_file"
+    if [[ "$audit_status" -ne 0 ]]; then
+      return "$audit_status"
+    fi
+    return 1
+  fi
+
+  printf '%s\n' "$parsed_output"
+  rm -f "$output_file" "$error_file"
+  return "$parser_status"
 }
 
 expand_test_profile() {
@@ -1004,6 +1166,18 @@ python_tests_exist() {
     || find "$project_root" -maxdepth 3 \( -name 'test_*.py' -o -name '*_test.py' \) -print -quit 2>/dev/null | grep -q .
 }
 
+find_python_test_target() {
+  local project_root="$1"
+
+  first_existing_path "$project_root/tests" "$project_root/test" "$project_root" || true
+}
+
+find_python_integration_test_path() {
+  local project_root="$1"
+
+  first_existing_path "$project_root/tests/integration" "$project_root/integration" "$project_root/test/integration" || true
+}
+
 first_existing_path() {
   local candidate
 
@@ -1090,6 +1264,8 @@ run_test_tier_for_root() {
   local ran=0
   local config_path=""
   local test_path=""
+  local integration_path=""
+  local unit_target=""
 
   printf -v "$result_var" '%s' 0
 
@@ -1099,8 +1275,16 @@ run_test_tier_for_root() {
         python|fullstack)
           if python_tests_exist "$project_root"; then
             ran=1
-            echo "Running Python unit tests..."
-            run_python_pytest "$project_root" || return 1
+            unit_target="$(find_python_test_target "$project_root")"
+            integration_path="$(find_python_integration_test_path "$project_root")"
+
+            if [[ -n "$integration_path" ]]; then
+              echo "Running Python unit tests (${unit_target#"$project_root/"} excluding ${integration_path#"$project_root/"})..."
+              run_python_pytest "$project_root" "$unit_target" --ignore "$integration_path" || return 1
+            else
+              echo "Running Python unit tests (${unit_target#"$project_root/"})..."
+              run_python_pytest "$project_root" "$unit_target" || return 1
+            fi
           fi
           ;;&
         typescript|fullstack)
@@ -1143,10 +1327,10 @@ run_test_tier_for_root() {
     integration)
       case "$stack" in
         python|fullstack)
-          test_path="$(first_existing_path "$project_root/tests/integration" "$project_root/integration" "$project_root/test/integration" || true)"
+          test_path="$(find_python_integration_test_path "$project_root")"
           if [[ -n "$test_path" ]]; then
             ran=1
-            echo "Running Python integration tests..."
+            echo "Running Python integration tests (${test_path#"$project_root/"})..."
             run_python_pytest "$project_root" "$test_path" || return 1
           fi
           ;;&
@@ -1457,20 +1641,7 @@ run_audit() {
     case "$stack" in
       python|fullstack)
         echo "Running Python dependency audit..."
-        if command -v uv >/dev/null 2>&1; then
-          if [[ $fix_mode -eq 1 ]]; then
-            (cd "$project_root" && uv pip audit 2>/dev/null) || {
-              echo "[info] uv pip audit not available; trying pip-audit directly"
-              (cd "$project_root" && uvx pip-audit) || exit_code=1
-            }
-          else
-            (cd "$project_root" && uvx pip-audit) || exit_code=1
-          fi
-        elif command -v pip-audit >/dev/null 2>&1; then
-          (cd "$project_root" && pip-audit) || exit_code=1
-        else
-          echo "[info] pip-audit not available. Install with: uvx pip-audit"
-        fi
+        run_python_dependency_audit "$project_root" "$fix_mode" || exit_code=1
         ;;&
       typescript|fullstack)
         echo "Running JavaScript dependency audit..."
@@ -1696,8 +1867,9 @@ run_feature_status() {
   local as_json="${1:-0}"
   local feature_dir feature_name branch=""
   local -a artifact_paths=() artifact_labels=()
-  local -a present_labels=() pending_labels=() recent_lines=()
-  local current_stage="unknown" next_action="" next_command=""
+  local -a present_labels=() pending_labels=() skipped_labels=() recent_lines=()
+  local current_stage="unknown" next_stage="" next_action="" next_command=""
+  local design_path design_skip_path design_inferred_skip=0
 
   feature_dir="$(get_active_feature_dir "$target_dir" 2>/dev/null || true)"
 
@@ -1723,6 +1895,8 @@ run_feature_status() {
   fi
 
   feature_name="$(basename "$feature_dir")"
+  design_path="$target_dir/.specify/memory/design-direction.md"
+  design_skip_path="$target_dir/.specify/memory/design-skipped.md"
 
   # Canonical artifact checklist (stage -> path label).
   # Order matters: it drives the "current stage" detection.
@@ -1755,38 +1929,83 @@ run_feature_status() {
     "$feature_dir/learn.md"
   )
 
-  # Walk in order; only a contiguous artifact chain advances the current stage.
+  if [[ ! -f "$design_path" && ! -f "$design_skip_path" ]]; then
+    local later_path
+    for later_path in \
+      "$feature_dir/plan.md" \
+      "$feature_dir/tasks.md" \
+      "$feature_dir/analyze.md" \
+      "$feature_dir/test-results.md" \
+      "$feature_dir/review.md" \
+      "$feature_dir/release.md" \
+      "$feature_dir/operate.md" \
+      "$feature_dir/learn.md"; do
+      if [[ -f "$later_path" ]]; then
+        design_inferred_skip=1
+        break
+      fi
+    done
+  fi
+
+  # Walk in order; only a contiguous satisfied chain advances the current stage.
+  # Optional design can be satisfied by a real artifact, an explicit skip marker,
+  # or inference from later completed stages.
   local i count=${#artifact_labels[@]}
   local contiguous=1
   for (( i=0; i<count; i++ )); do
     local label="${artifact_labels[$i]}"
     local path="${artifact_paths[$i]}"
+    local artifact_state="pending"
+
     if [[ -f "$path" ]]; then
-      present_labels+=("$label")
-      if [[ "$contiguous" -eq 1 ]]; then
-        current_stage="$label"
-      fi
-    else
-      pending_labels+=("$label")
-      contiguous=0
+      artifact_state="present"
+    elif [[ "$label" == "design" ]] && [[ -f "$design_skip_path" || "$design_inferred_skip" -eq 1 ]]; then
+      artifact_state="skipped"
     fi
+
+    case "$artifact_state" in
+      present)
+        present_labels+=("$label")
+        if [[ "$contiguous" -eq 1 ]]; then
+          current_stage="$label"
+        fi
+        ;;
+      skipped)
+        skipped_labels+=("$label")
+        if [[ "$contiguous" -eq 1 ]]; then
+          current_stage="$label"
+        fi
+        ;;
+      *)
+        pending_labels+=("$label")
+        contiguous=0
+        ;;
+    esac
   done
 
-  # Pick next action from the first pending artifact.
+  # Derive the next lifecycle stage from the first pending artifact. Implement
+  # and verify do not have durable artifacts, so they sit in front of test and
+  # release respectively.
   if (( ${#pending_labels[@]} > 0 )); then
     case "${pending_labels[0]}" in
+      test) next_stage="implement" ;;
+      release) next_stage="verify" ;;
+      *) next_stage="${pending_labels[0]}" ;;
+    esac
+
+    case "$next_stage" in
       discover)     next_action="Align feature context, then capture discovery for the feature"; next_command="/speckit.discover" ;;
-      constitution) next_action="Lock project standards";          next_command="/speckit.constitution" ;;
-      specify)      next_action="Write the feature spec";          next_command="/speckit.specify" ;;
-      design)       next_action="Define design direction";         next_command="Designer agent or /speckit.design" ;;
-      plan)         next_action="Produce the technical plan";      next_command="/speckit.plan" ;;
-      tasks)        next_action="Break work into tasks";           next_command="/speckit.tasks" ;;
-      analyze)      next_action="Run consistency analysis";        next_command="/speckit.analyze" ;;
-      test)         next_action="Run and capture test results";    next_command="/speckit.test" ;;
-      review)       next_action="Synthesize the code review";      next_command="Code Reviewer agent" ;;
-      release)      next_action="Prepare the release";             next_command="kite release prepare --bump <level> ." ;;
-      operate)      next_action="Capture monitoring & alerts";     next_command="DevOps agent (operate stage)" ;;
-      learn)        next_action="Record post-release learnings";   next_command="Orchestrator (learn stage)" ;;
+      constitution) next_action="Lock project standards"; next_command="/speckit.constitution" ;;
+      specify)      next_action="Write the feature spec"; next_command="/speckit.specify" ;;
+      design)       next_action="Define design direction, or mark design skipped for backend-only work"; next_command="Designer agent or /speckit.design" ;;
+      plan)         next_action="Produce the technical plan"; next_command="/speckit.plan" ;;
+      tasks)        next_action="Break work into tasks"; next_command="/speckit.tasks" ;;
+      analyze)      next_action="Run consistency analysis"; next_command="/speckit.analyze" ;;
+      implement)    next_action="Implement the approved task list"; next_command="Backend Dev agent or UI Builder agent" ;;
+      review)       next_action="Synthesize the code review"; next_command="Code Reviewer agent" ;;
+      verify)       next_action="Run the pre-merge verification gate"; next_command="kite verify feature ." ;;
+      operate)      next_action="Capture monitoring & alerts"; next_command="DevOps agent (operate stage)" ;;
+      learn)        next_action="Record post-release learnings"; next_command="Orchestrator (learn stage)" ;;
     esac
   else
     next_action="All canonical artifacts present"
@@ -1826,9 +2045,10 @@ run_feature_status() {
 
   if [[ "$as_json" -eq 1 ]]; then
     # Build JSON arrays via json_array helper.
-    local present_json pending_json
+    local present_json pending_json skipped_json
     present_json="$(json_array "${present_labels[@]+"${present_labels[@]}"}")"
     pending_json="$(json_array "${pending_labels[@]+"${pending_labels[@]}"}")"
+    skipped_json="$(json_array "${skipped_labels[@]+"${skipped_labels[@]}"}")"
     local recent_json="[" first=1 r
     for r in "${recent_lines[@]:-}"; do
       [[ -z "$r" ]] && continue
@@ -1837,13 +2057,15 @@ run_feature_status() {
     done
     recent_json+="]"
 
-    printf '{"status":"active","feature":%s,"feature_dir":%s,"branch":%s,"current_stage":%s,"present":%s,"pending":%s,"recent":%s,"next_action":%s,"next_command":%s}\n' \
+    printf '{"status":"active","feature":%s,"feature_dir":%s,"branch":%s,"current_stage":%s,"next_stage":%s,"present":%s,"pending":%s,"skipped":%s,"recent":%s,"next_action":%s,"next_command":%s}\n' \
       "$(json_escape "$feature_name")" \
       "$(json_escape "${feature_dir#"$target_dir/"}")" \
       "$(json_escape "$branch")" \
       "$(json_escape "$current_stage")" \
+      "$(json_escape "$next_stage")" \
       "$present_json" \
       "$pending_json" \
+      "$skipped_json" \
       "$recent_json" \
       "$(json_escape "$next_action")" \
       "$(json_escape "$next_command")"
@@ -1853,6 +2075,7 @@ run_feature_status() {
   echo "Feature:  $feature_name"
   echo "Branch:   ${branch:-<none>}"
   echo "Stage:    $current_stage"
+  echo "Next:     ${next_stage:-<none>}"
   echo ""
   echo "Artifacts:"
   for (( i=0; i<count; i++ )); do
@@ -1860,6 +2083,10 @@ run_feature_status() {
     local path="${artifact_paths[$i]}"
     if [[ -f "$path" ]]; then
       printf '  [x] %-12s %s\n' "$label" "${path#"$target_dir/"}"
+    elif [[ "$label" == "design" ]] && [[ -f "$design_skip_path" ]]; then
+      printf '  [~] %-12s %s\n' "$label" "${design_skip_path#"$target_dir/"}"
+    elif [[ "$label" == "design" ]] && [[ "$design_inferred_skip" -eq 1 ]]; then
+      printf '  [~] %-12s %s\n' "$label" ".specify/memory/design-skipped.md (inferred from later artifacts)"
     else
       printf '  [ ] %-12s %s\n' "$label" "${path#"$target_dir/"}"
     fi
@@ -1952,6 +2179,10 @@ Stage: design
 What it is:
   Visual direction, design system, color, typography, spacing, component
   principles. Only needed for features with UI surface.
+
+Skip it when:
+  The feature has no UI surface. Create .specify/memory/design-skipped.md,
+  or let kite infer the skip once plan.md or a later artifact exists.
 
 Who runs it:
   Designer agent (interactive) or /speckit.design.

@@ -31,3 +31,5 @@ kite test --e2e .
 ## Notes
 
 The default profile comes from `.kite/config.yml` when present. Edit that file directly when you want to change the preferred verification profile for future test runs.
+
+For Python projects, the `unit` tier targets `tests/` or `test/` and automatically excludes `tests/integration/`, `integration/`, or `test/integration/` when those folders exist. Kite prints the exact pytest target path for both the unit and integration tiers.

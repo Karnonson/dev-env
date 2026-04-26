@@ -33,4 +33,6 @@ Use this command inside the dev container after the workspace assets are already
 
 After it completes, the target repository has the bundled authoring surfaces under `.specify/`, so the next interactive flow can move through discovery, constitution, specification, design when needed, planning, and the downstream implementation stages.
 
+Kite keeps `.github/` versioned as workspace customization. If the upstream Spec Kit bootstrap warns about ignoring `.github/`, treat that as a generic warning rather than kite guidance.
+
 Host-side `--with-speckit` remains available as a secondary shortcut and requires `curl`, `tar`, and `uvx` or `specify` on the host.

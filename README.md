@@ -19,6 +19,8 @@ kite status .
 
 That bootstrap installs Kite's bundled Speckit preset, including the canonical `speckit.discover`, `speckit.constitution`, `speckit.specify`, `speckit.design`, `speckit.plan`, `speckit.implement*`, and `speckit.test` command prompts plus the default artifact templates under `.specify/templates/` such as `spec.md` and `plan.md`.
 
+Kite keeps `.github/` versioned as workspace customization. Do not add `.github/` to `.gitignore`, even if the upstream Spec Kit bootstrap prints a generic security warning about agent folders.
+
 If you need to copy the workspace assets into an existing repository first, the host-side bootstrap is available as a secondary path. It requires `curl` and `tar` on the host. Add `uvx` or `specify` only if you also want host-side Speckit bootstrap with `--with-speckit`.
 
 ```bash

@@ -737,6 +737,8 @@ else
 fi
 if [[ $with_speckit -eq 1 ]]; then
   echo "Spec Kit bootstrap completed with version target $speckit_version."
+  echo "Note: Kite keeps .github/ versioned as workspace customization files."
+  echo "Do not add .github/ to .gitignore; the upstream Spec Kit security warning is generic and does not apply to this workflow."
 fi
 if [[ $preserved_existing_devcontainer -eq 1 ]]; then
   echo "Existing .devcontainer was preserved. Kite support files were refreshed in .devcontainer/bin/kite, .devcontainer/kite-post-create.sh, and .devcontainer/README.kite.md."

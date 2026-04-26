@@ -8,5 +8,12 @@ scaffold:
 workflow:
   test_tier: standard
 
+audit:
+  python:
+    ignore_packages:
+      - pip
+      - setuptools
+      - wheel
+
 deploy:
   target: none

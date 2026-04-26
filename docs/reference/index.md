@@ -29,7 +29,7 @@ The supported product story is container-first: run `kite` inside a repository o
 - [kite feature](feature.md)
 - [kite explain](explain.md)
 
-The recommended lifecycle is `feature start -> discover -> constitution -> specify -> design -> plan -> tasks -> analyze -> implement -> test -> review`. `brief` remains legacy artifact language rather than a recommended default stage.
+The recommended lifecycle is `feature start -> discover -> constitution -> specify -> design when needed -> plan -> tasks -> analyze -> implement -> test -> review -> verify -> release`. `brief` remains legacy artifact language rather than a recommended default stage.
 
 ## Shell Integration And Help
 

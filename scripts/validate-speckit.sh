@@ -24,6 +24,9 @@ doctor_log="$temp_root/doctor.log"
 status_log="$temp_root/status.log"
 dry_run_log="$temp_root/update-dry-run.log"
 status_json_log="$temp_root/status.json"
+install_log="$temp_root/install-speckit.log"
+audit_log="$temp_root/audit.log"
+test_log="$temp_root/test.log"
 
 cleanup() {
   rm -rf "$temp_root"
@@ -173,7 +176,7 @@ grep -q '"status":"action-needed"' "$status_json_log"
 
 (
   cd "$cli_target_dir"
-  bash "$repo_root/.devcontainer/bin/kite" install speckit --source-dir "$repo_root"
+  bash "$repo_root/.devcontainer/bin/kite" install speckit --source-dir "$repo_root" > "$install_log"
 )
 
 test -f "$cli_target_dir/.specify/workflows/orchestrator-design-first/workflow.yml"
@@ -182,6 +185,7 @@ test -f "$cli_target_dir/.specify/templates/spec.md"
 test -f "$cli_target_dir/.specify/templates/plan.md"
 test -f "$cli_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.backend.md"
 test -f "$cli_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.implement.ui.md"
+grep -q "Do not add .github/ to .gitignore" "$install_log"
 
 (
   cd "$cli_target_dir"
@@ -298,6 +302,59 @@ cat "$cli_target_dir/.specify/templates/plan.md" >> "$cli_target_dir/specs/smoke
 grep -q '"current_stage":"plan"' "$status_json_log"
 grep -q '"next_command":"/speckit.tasks"' "$status_json_log"
 
+mkdir -p "$cli_target_dir/specs/smoke-backend-flow"
+printf '{"name":"smoke-backend-flow"}\n' > "$cli_target_dir/.specify/feature.json"
+rm -f "$cli_target_dir/.specify/memory/design-direction.md" "$cli_target_dir/.specify/memory/design-skipped.md"
+
+cat > "$cli_target_dir/specs/smoke-backend-flow/discovery.md" <<'EOF'
+# discovery
+EOF
+cat > "$cli_target_dir/specs/smoke-backend-flow/spec.md" <<'EOF'
+# spec
+EOF
+cat > "$cli_target_dir/specs/smoke-backend-flow/plan.md" <<'EOF'
+# plan
+EOF
+cat > "$cli_target_dir/specs/smoke-backend-flow/tasks.md" <<'EOF'
+- [x] backend task
+EOF
+
+(
+  cd "$cli_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" feature --json > "$status_json_log"
+)
+grep -q '"current_stage":"tasks"' "$status_json_log"
+grep -q '"next_stage":"analyze"' "$status_json_log"
+grep -q '"skipped":\["design"\]' "$status_json_log"
+grep -q '"next_command":"/speckit.analyze"' "$status_json_log"
+
+cat > "$cli_target_dir/specs/smoke-backend-flow/analyze.md" <<'EOF'
+# analyze
+EOF
+
+(
+  cd "$cli_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" feature --json > "$status_json_log"
+)
+grep -q '"current_stage":"analyze"' "$status_json_log"
+grep -q '"next_stage":"implement"' "$status_json_log"
+grep -q '"next_command":"Backend Dev agent or UI Builder agent"' "$status_json_log"
+
+cat > "$cli_target_dir/specs/smoke-backend-flow/test-results.md" <<'EOF'
+# test results
+EOF
+cat > "$cli_target_dir/specs/smoke-backend-flow/review.md" <<'EOF'
+# review
+EOF
+
+(
+  cd "$cli_target_dir"
+  bash "$repo_root/.devcontainer/bin/kite" feature --json > "$status_json_log"
+)
+grep -q '"current_stage":"review"' "$status_json_log"
+grep -q '"next_stage":"verify"' "$status_json_log"
+grep -q '"next_command":"kite verify feature ."' "$status_json_log"
+
 rm -f "$cli_target_dir/.specify/presets/orchestrator-workflow/commands/speckit.test.md"
 
 (
@@ -390,6 +447,96 @@ grep -q -- "--json" "$status_log"
 )
 grep -q -- "--tier" "$status_log"
 grep -q -- "--profile" "$status_log"
+
+python_test_target_dir="$temp_root/python-test-target"
+mkdir -p "$python_test_target_dir/tests/integration" "$python_test_target_dir/.stubbin"
+cat > "$python_test_target_dir/pyproject.toml" <<'EOF'
+[project]
+name = "python-test-target"
+version = "0.1.0"
+EOF
+cat > "$python_test_target_dir/tests/test_unit.py" <<'EOF'
+def test_unit():
+    assert True
+EOF
+cat > "$python_test_target_dir/tests/integration/test_integration.py" <<'EOF'
+def test_integration():
+    assert True
+EOF
+cat > "$python_test_target_dir/.stubbin/uv" <<'EOF'
+#!/usr/bin/env bash
+printf 'UV_ARGS:%s\n' "$*"
+EOF
+chmod +x "$python_test_target_dir/.stubbin/uv"
+
+PATH="$python_test_target_dir/.stubbin:$PATH" bash "$repo_root/.devcontainer/bin/kite" test --profile standard "$python_test_target_dir" > "$test_log"
+grep -q "Running Python unit tests (tests excluding tests/integration)" "$test_log"
+grep -q "UV_ARGS:run pytest -v $python_test_target_dir/tests --ignore $python_test_target_dir/tests/integration" "$test_log"
+grep -q "Running Python integration tests (tests/integration)" "$test_log"
+grep -q "UV_ARGS:run pytest -v $python_test_target_dir/tests/integration" "$test_log"
+
+audit_target_dir="$temp_root/python-audit-target"
+mkdir -p "$audit_target_dir/.stubbin"
+cat > "$audit_target_dir/pyproject.toml" <<'EOF'
+[project]
+name = "python-audit-target"
+version = "0.1.0"
+EOF
+cat > "$audit_target_dir/.stubbin/uvx" <<'EOF'
+#!/usr/bin/env bash
+cat "$UVX_FIXTURE"
+EOF
+chmod +x "$audit_target_dir/.stubbin/uvx"
+cat > "$audit_target_dir/ignored-only.json" <<'EOF'
+[
+  {
+    "name": "pip",
+    "version": "24.0",
+    "vulns": [
+      {
+        "id": "GHSA-aaaa-bbbb-cccc",
+        "fix_versions": []
+      }
+    ]
+  }
+]
+EOF
+PATH="$audit_target_dir/.stubbin:$PATH" UVX_FIXTURE="$audit_target_dir/ignored-only.json" bash "$repo_root/.devcontainer/bin/kite" audit "$audit_target_dir" > "$audit_log"
+grep -q "Ignored Python audit findings for toolchain packages: pip" "$audit_log"
+grep -q "Audit status: clean" "$audit_log"
+
+cat > "$audit_target_dir/ignored-plus-app.json" <<'EOF'
+[
+  {
+    "name": "pip",
+    "version": "24.0",
+    "vulns": [
+      {
+        "id": "GHSA-aaaa-bbbb-cccc",
+        "fix_versions": []
+      }
+    ]
+  },
+  {
+    "name": "requests",
+    "version": "2.31.0",
+    "vulns": [
+      {
+        "id": "GHSA-zzzz-yyyy-xxxx",
+        "aliases": ["CVE-2024-1234"],
+        "fix_versions": ["2.32.4"]
+      }
+    ]
+  }
+]
+EOF
+if PATH="$audit_target_dir/.stubbin:$PATH" UVX_FIXTURE="$audit_target_dir/ignored-plus-app.json" bash "$repo_root/.devcontainer/bin/kite" audit "$audit_target_dir" > "$audit_log"; then
+  echo "Expected kite audit to fail when a non-ignored package has findings" >&2
+  exit 1
+fi
+grep -q "Ignored Python audit findings for toolchain packages: pip" "$audit_log"
+grep -q "requests 2.31.0: GHSA-zzzz-yyyy-xxxx" "$audit_log"
+grep -q "Audit status: findings detected" "$audit_log"
 
 bash "$repo_root/.devcontainer/bin/kite" completion bash > "$status_log"
 grep -q "complete -F _kite_completion kite" "$status_log"
